@@ -1,1 +1,14 @@
+# Maven/Java
 target/
+*.log
+*.iml
+.classpath
+.project
+.settings/
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+# Node leftovers (if any)
+node_modules/
+dist/
