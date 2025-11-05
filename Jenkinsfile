@@ -2,13 +2,13 @@ pipeline {
   agent any
 
   tools {
-    jdk 'jdk-21'
-    maven 'maven-3.9'
+    // Keep this name equal to your Jenkins Global Tool config
+    maven 'Maven'        // <-- you said Name: Maven
+    jdk   'jdk-21'       // <-- make sure you created a JDK tool with this name
   }
 
   options {
     timestamps()
-    ansiColor('xterm')
     buildDiscarder(logRotator(numToKeepStr: '20'))
   }
 
@@ -27,6 +27,13 @@ pipeline {
             credentialsId: env.GIT_CREDENTIALS_ID
           ]]
         ])
+      }
+    }
+
+    stage('Verify tool versions') {
+      steps {
+        sh 'java -version'
+        sh 'mvn -version'
       }
     }
 
@@ -51,8 +58,8 @@ pipeline {
   }
 
   post {
-    success { echo '✅ Build green. Ping endpoint, Actuator & Swagger should be OK.' }
-    unstable { echo '⚠️ Unstable: check tests and coverage.' }
+    success { echo '✅ Build green.' }
+    unstable { echo '⚠️ Unstable: check tests/coverage.' }
     failure { echo '❌ Build failed.' }
   }
 }
