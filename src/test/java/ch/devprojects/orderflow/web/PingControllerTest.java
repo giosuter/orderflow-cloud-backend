@@ -28,6 +28,6 @@ class PingControllerTest {
     void pingTime_shouldReturnPongWithTimestampPrefix() throws Exception {
         mockMvc.perform(get("/api/ping/time"))
                .andExpect(status().isOk())
-               .andExpect(content().string(startsWith("pong@")));
+               .andExpect(content().string(startsWith("ping_the_endpoint_time@")));
     }
 }
