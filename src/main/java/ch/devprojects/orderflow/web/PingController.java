@@ -19,6 +19,6 @@ public class PingController {
     // New endpoint that gives you something to change without breaking tests
     @GetMapping("/ping/time")
     public String pingTime() {
-        return "pong@" + Instant.now(); // trivial change to generate a new commit
+        return "ping_the_endpoint_time@" + Instant.now(); // trivial change to generate a new commit
     }
 }
