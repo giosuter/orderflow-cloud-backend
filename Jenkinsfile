@@ -8,10 +8,9 @@ pipeline {
 
   options {
     timestamps()
-    ansiColor('xterm')
     buildDiscarder(logRotator(numToKeepStr: '20'))
     disableConcurrentBuilds()
-    wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm'])
+    // NOTE: no ansiColor/wrap here — your Jenkins doesn't support them in options
   }
 
   triggers {
@@ -25,8 +24,6 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        // Use one of the two lines below:
-        // checkout scm
         checkout([
           $class: 'GitSCM',
           branches: [[name: '*/main']],
@@ -40,14 +37,18 @@ pipeline {
 
     stage('Verify tool versions') {
       steps {
-        sh 'java -version'
-        sh 'mvn -version'
+        ansiColor('xterm') {
+          sh 'java -version'
+          sh 'mvn -version'
+        }
       }
     }
 
     stage('Build & Test') {
       steps {
-        sh 'mvn -B -U -DskipTests=false clean verify'
+        ansiColor('xterm') {
+          sh 'mvn -B -U -DskipTests=false clean verify'
+        }
       }
       post {
         always {
