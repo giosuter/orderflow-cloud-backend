@@ -22,6 +22,9 @@ pipeline {
   }
 
   stages {
+	stage('Marker') {
+      steps { echo 'JENKINSFILE_MARKER: v-no-ansiwrap-001' }
+    }
     stage('Checkout') {
       steps {
         checkout([
