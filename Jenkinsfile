@@ -68,7 +68,7 @@ pipeline {
           publishHTML(target: [
             reportDir: 'target/site/jacoco',
             reportFiles: 'index.html',
-            reportName: 'JaCoCo Coverage',
+            reportName: 'JaCoCo_Coverage',
             keepAll: true,
             alwaysLinkToLastBuild: true
           ])
