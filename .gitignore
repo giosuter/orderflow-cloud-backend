@@ -1,14 +1,38 @@
-# Maven/Java
+# -------------------------
+# Build outputs (Maven/Java)
+# -------------------------
 target/
 *.log
-*.iml
+
+# -------------------------
+# Eclipse / STS (Spring Tool Suite)
+# -------------------------
 .classpath
 .project
 .settings/
-# OS / IDE
-.DS_Store
+.factorypath
+.springBeans
+# Old/rare Eclipse outputs (harmless if present)
+bin/
+
+# -------------------------
+# IntelliJ IDEA
+# -------------------------
+*.iml
 .idea/
+
+# -------------------------
+# VS Code
+# -------------------------
 .vscode/
+
+# -------------------------
+# OS junk
+# -------------------------
+.DS_Store
+
+# -------------------------
 # Node leftovers (if any)
+# -------------------------
 node_modules/
 dist/
