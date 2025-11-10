@@ -13,7 +13,12 @@ public class PingController {
 
 	@GetMapping("/ping")
 	public ResponseEntity<String> ping() {
-		return ResponseEntity.ok("OrderFlow API is alive");
+		return ResponseEntity.ok("OrderFlow API is alive - Ping Pang Peng");
+	}
+	
+	@GetMapping("/pong")
+	public ResponseEntity<String> pong() {
+		return ResponseEntity.ok("OrderFlow API is alive - Pong");
 	}
 	
     // New endpoint that gives you something to change without breaking tests

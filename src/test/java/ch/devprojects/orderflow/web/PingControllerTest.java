@@ -17,11 +17,19 @@ class PingControllerTest {
 	private MockMvc mockMvc;
 
 	@Test
-	void ping_shouldReturnAliveMessage() throws Exception {
+	void ping_shouldReturnAliveMessagePing() throws Exception {
 		// With @WebMvcTest, MockMvc uses the controller mappings only, no server
 		// context-path.
 		mockMvc.perform(get("/api/ping")).andExpect(status().isOk())
-				.andExpect(content().string("OrderFlow API is alive"));
+				.andExpect(content().string("OrderFlow API is alive - Ping Pang Peng"));
+	}
+	
+	@Test
+	void ping_shouldReturnAliveMessagePong() throws Exception {
+		// With @WebMvcTest, MockMvc uses the controller mappings only, no server
+		// context-path.
+		mockMvc.perform(get("/api/pong")).andExpect(status().isOk())
+				.andExpect(content().string("OrderFlow API is alive - Pong"));
 	}
 	
     @Test
