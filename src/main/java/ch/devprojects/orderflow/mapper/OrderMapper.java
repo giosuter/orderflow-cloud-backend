@@ -1,5 +1,7 @@
 package ch.devprojects.orderflow.mapper;
 
+import org.springframework.stereotype.Component;
+
 import ch.devprojects.orderflow.domain.Order;
 import ch.devprojects.orderflow.dto.OrderDto;
 
@@ -7,6 +9,8 @@ import ch.devprojects.orderflow.dto.OrderDto;
  * DTO uses strings for frontend compatibility.
  * Entity uses enums for safer persistence.
  */
+
+@Component
 public class OrderMapper {
 
 	// ------------------------------
