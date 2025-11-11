@@ -1,23 +1,25 @@
 package ch.devprojects.orderflow.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 
 public class OrderDto {
+
 	private Long id;
 
 	@NotBlank
-	@Size(max = 64)
 	private String code;
 
 	@NotNull
-	@DecimalMin(value = "0.00")
-	private BigDecimal total;
+	private String status; // NEW / PROCESSING / DONE
 
-	@NotBlank
-	@Size(max = 16)
-	private String status;
+	@NotNull
+	@PositiveOrZero
+	private BigDecimal total; // <<— add this
 
 	private Instant createdAt;
 	private Instant updatedAt;
@@ -38,20 +40,20 @@ public class OrderDto {
 		this.code = code;
 	}
 
-	public BigDecimal getTotal() {
-		return total;
-	}
-
-	public void setTotal(BigDecimal total) {
-		this.total = total;
-	}
-
 	public String getStatus() {
 		return status;
 	}
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	public BigDecimal getTotal() {
+		return total;
+	}
+
+	public void setTotal(BigDecimal total) {
+		this.total = total;
 	}
 
 	public Instant getCreatedAt() {
