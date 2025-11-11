@@ -7,36 +7,55 @@ import ch.devprojects.orderflow.dto.OrderDto;
  * DTO uses strings for frontend compatibility.
  * Entity uses enums for safer persistence.
  */
-public final class OrderMapper {
-    private OrderMapper() {}
+public class OrderMapper {
 
-    public static OrderDto toDto(Order e) {
-        OrderDto d = new OrderDto();
-        d.setId(e.getId());
-        d.setCode(e.getCode());
-        d.setTotal(e.getTotal());
-     // convert enum to string
-        d.setStatus(e.getStatus().name());  
-        d.setCreatedAt(e.getCreatedAt());
-        d.setUpdatedAt(e.getUpdatedAt());
-        return d;
-    }
+	// ------------------------------
+	// Convert Entity → DTO
+	// ------------------------------
+	public OrderDto toDto(Order entity) {
+		if (entity == null)
+			return null;
 
-    public static Order toEntity(OrderDto d) {
-        Order e = new Order();
-        e.setId(d.getId());
-        e.setCode(d.getCode());
-        e.setTotal(d.getTotal());
-        // convert string to enum
-        e.setStatus(Order.Status.valueOf(d.getStatus()));
-        e.setCreatedAt(d.getCreatedAt());
-        e.setUpdatedAt(d.getUpdatedAt());
-        return e;
-    }
+		OrderDto dto = new OrderDto();
+		dto.setId(entity.getId());
+		dto.setCode(entity.getCode());
+		dto.setStatus(entity.getStatus().name());
+		dto.setCreatedAt(entity.getCreatedAt());
+		dto.setUpdatedAt(entity.getUpdatedAt());
 
-    public static void copyForUpdate(Order e, OrderDto d) {
-        e.setTotal(d.getTotal());
-        // string to enum
-        e.setStatus(Order.Status.valueOf(d.getStatus()));
-    }
+		return dto;
+	}
+
+	// ------------------------------
+	// Convert DTO → Entity
+	// ------------------------------
+	public Order toEntity(OrderDto dto) {
+		if (dto == null)
+			return null;
+
+		Order entity = new Order();
+		entity.setCode(dto.getCode());
+
+		if (dto.getStatus() != null) {
+			entity.setStatus(Order.Status.valueOf(dto.getStatus()));
+		}
+
+		// createdAt and updatedAt will be set by JPA (if using @PrePersist /
+		// @PreUpdate)
+
+		return entity;
+	}
+
+	// ------------------------------
+	// Update existing entity from DTO
+	// ------------------------------
+	public void updateEntity(Order entity, OrderDto dto) {
+		if (dto.getCode() != null) {
+			entity.setCode(dto.getCode());
+		}
+
+		if (dto.getStatus() != null) {
+			entity.setStatus(Order.Status.valueOf(dto.getStatus()));
+		}
+	}
 }
