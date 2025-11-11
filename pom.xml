@@ -77,7 +77,19 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-
+        
+		<!-- FLYWAY MIGRATIONS -->
+		<dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+		</dependency>
+		
+		<!-- FLYWAY DATABASE SUPPORT FOR MYSQL/MARIADB (NEEDED SINCE FLYWAY 10.X) -->
+		<dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+        
     </dependencies>
 
     <build>
