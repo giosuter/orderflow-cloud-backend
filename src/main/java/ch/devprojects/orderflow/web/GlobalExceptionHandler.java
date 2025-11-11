@@ -1,91 +1,71 @@
 package ch.devprojects.orderflow.web;
 
-import jakarta.persistence.EntityNotFoundException;
-import jakarta.servlet.http.HttpServletRequest;
+import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
+
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 
 /**
- * Global exception handler.
- * Covers: bad JSON (400), bean validation (422), not found (404), DB unique conflicts (409), 
- * illegal args (400), and a safe 500 fallback.
+ * Global exception handler. Covers: bad JSON (400), bean validation (422), not
+ * found (404), DB unique conflicts (409), illegal args (400), and a safe 500
+ * fallback.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-	private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, HttpServletRequest req) {
-		ErrorResponse body = new ErrorResponse(status.value(), status.getReasonPhrase(), message, req.getRequestURI());
-		return ResponseEntity.status(status).body(body);
-	}
-
-	/** 400 Bad Request – malformed JSON, wrong enum, etc. */
-	@ExceptionHandler(HttpMessageNotReadableException.class)
-	public ResponseEntity<ErrorResponse> badJson(HttpMessageNotReadableException ex, HttpServletRequest req) {
-		return build(HttpStatus.BAD_REQUEST, rootMsg(ex), req);
-	}
-
-	/** 422 Unprocessable Entity – bean validation errors from @Valid */
-	@ExceptionHandler(MethodArgumentNotValidException.class)
-	public ResponseEntity<ErrorResponse> validation(MethodArgumentNotValidException ex, HttpServletRequest req) {
-		String msg = ex.getBindingResult().getFieldErrors().stream().map(this::formatFieldError)
-				.collect(Collectors.joining("; "));
-		if (msg.isBlank())
-			msg = "Validation failed";
-		return build(HttpStatus.UNPROCESSABLE_ENTITY, msg, req);
-	}
-
-	private String formatFieldError(FieldError fe) {
-		String field = fe.getField();
-		String code = fe.getCode();
-		String def = fe.getDefaultMessage();
-		return field + ": " + (def != null ? def : code);
-	}
-
-	/** 404 Not Found – when service throws EntityNotFoundException */
-	@ExceptionHandler(EntityNotFoundException.class)
-	public ResponseEntity<ErrorResponse> notFound(EntityNotFoundException ex, HttpServletRequest req) {
-		return build(HttpStatus.NOT_FOUND, rootMsg(ex), req);
-	}
-
-	/** 409 Conflict – unique constraint violations (e.g., duplicate order code) */
-	@ExceptionHandler(DataIntegrityViolationException.class)
-	public ResponseEntity<ErrorResponse> conflict(DataIntegrityViolationException ex, HttpServletRequest req) {
-		return build(HttpStatus.CONFLICT, friendlyConstraintMessage(ex), req);
-	}
-
-	/** 400 Bad Request – generic illegal arguments in service layer */
+	// 400 – bad client input (e.g., illegal enum value)
 	@ExceptionHandler(IllegalArgumentException.class)
-	public ResponseEntity<ErrorResponse> illegalArg(IllegalArgumentException ex, HttpServletRequest req) {
-		return build(HttpStatus.BAD_REQUEST, rootMsg(ex), req);
+	public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest req) {
+		return ResponseEntity.badRequest()
+				.body(new ErrorResponse(400, "Bad Request", ex.getMessage(), req.getRequestURI()));
 	}
 
-	/** 500 – catch-all */
+	// 422 – @Valid body errors
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
+		String msg = ex.getBindingResult().getFieldErrors().stream()
+				.map(fe -> fe.getField() + ": " + fe.getDefaultMessage()).collect(Collectors.joining("; "));
+		return ResponseEntity.unprocessableEntity().body(new ErrorResponse(422, "Unprocessable Entity",
+				msg.isBlank() ? "Validation failed" : msg, req.getRequestURI()));
+	}
+
+	// 422 – @Validated on parameters (e.g., query/path) violations
+	@ExceptionHandler(ConstraintViolationException.class)
+	public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex,
+			HttpServletRequest req) {
+		String msg = ex.getConstraintViolations().stream().map(v -> v.getPropertyPath() + ": " + v.getMessage())
+				.collect(Collectors.joining("; "));
+		return ResponseEntity.unprocessableEntity().body(new ErrorResponse(422, "Unprocessable Entity",
+				msg.isBlank() ? "Constraint violation" : msg, req.getRequestURI()));
+	}
+
+	// 404 – entity not found in service layer lookups
+	@ExceptionHandler(NoSuchElementException.class)
+	public ResponseEntity<ErrorResponse> handleNotFound(NoSuchElementException ex, HttpServletRequest req) {
+		return ResponseEntity.status(404).body(new ErrorResponse(404, "Not Found",
+				ex.getMessage() == null ? "Resource not found" : ex.getMessage(), req.getRequestURI()));
+	}
+
+	// 409 – unique keys / FK problems, etc.
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
+			HttpServletRequest req) {
+		return ResponseEntity.status(409).body(new ErrorResponse(409, "Conflict", "Data integrity violation: "
+				+ (ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage()),
+				req.getRequestURI()));
+	}
+
+	// 500 – last resort
 	@ExceptionHandler(Exception.class)
-	public ResponseEntity<ErrorResponse> generic(Exception ex, HttpServletRequest req) {
-		return build(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error", req);
-	}
-
-	private String rootMsg(Throwable t) {
-		Throwable r = t;
-		while (r.getCause() != null)
-			r = r.getCause();
-		return r.getMessage() != null ? r.getMessage() : t.getClass().getSimpleName();
-	}
-
-	private String friendlyConstraintMessage(DataIntegrityViolationException ex) {
-		String m = rootMsg(ex);
-		// Soft parsing for common messages; adjust to your DB messages if needed
-		if (m != null && m.toLowerCase().contains("unique")) {
-			return "Duplicate value violates unique constraint";
-		}
-		return "Data integrity violation";
+	public ResponseEntity<ErrorResponse> handleAny(Exception ex, HttpServletRequest req) {
+		return ResponseEntity.status(500)
+				.body(new ErrorResponse(500, "Internal Server Error", "Unexpected error", req.getRequestURI()));
 	}
 }

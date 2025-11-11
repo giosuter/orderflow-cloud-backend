@@ -1,28 +1,28 @@
 package ch.devprojects.orderflow.web;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-
 import java.time.Instant;
 
 /**
- * Standard error payload
+ * Simple API error payload.
  */
 public class ErrorResponse {
-	@JsonFormat(shape = JsonFormat.Shape.STRING)
-	private Instant timestamp = Instant.now();
-	private int status;
-	private String error; // e.g. "Bad Request"
-	private String message; // human message, safe to show
-	private String path; // request path
-
-	public ErrorResponse() {
-	}
+	private final Instant timestamp;
+	private final int status;
+	private final String error;
+	private final String message;
+	private final String path;
 
 	public ErrorResponse(int status, String error, String message, String path) {
+		this.timestamp = Instant.now();
 		this.status = status;
 		this.error = error;
 		this.message = message;
 		this.path = path;
+	}
+
+	/** Optional factory for convenience. */
+	public static ErrorResponse of(int status, String error, String message, String path) {
+		return new ErrorResponse(status, error, message, path);
 	}
 
 	public Instant getTimestamp() {
@@ -43,25 +43,5 @@ public class ErrorResponse {
 
 	public String getPath() {
 		return path;
-	}
-
-	public void setTimestamp(Instant timestamp) {
-		this.timestamp = timestamp;
-	}
-
-	public void setStatus(int status) {
-		this.status = status;
-	}
-
-	public void setError(String error) {
-		this.error = error;
-	}
-
-	public void setMessage(String message) {
-		this.message = message;
-	}
-
-	public void setPath(String path) {
-		this.path = path;
 	}
 }
