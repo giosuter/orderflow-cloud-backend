@@ -26,52 +26,52 @@
 
     <dependencies>
 
-        <!-- ✅ WEB -->
+        <!-- WEB -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- ✅ VALIDATION -->
+        <!-- VALIDATION -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- ✅ JPA + HIBERNATE + HIKARI -->
+        <!-- JPA + HIBERNATE + HIKARI -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!-- ✅ ACTUATOR -->
+        <!-- ACTUATOR -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- ✅ TOMCAT PROVIDED FOR WAR DEPLOYMENT -->
+        <!-- TOMCAT PROVIDED FOR WAR DEPLOYMENT -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-tomcat</artifactId>
             <scope>provided</scope>
         </dependency>
 
-        <!-- ✅ DEV DB -->
+        <!-- DEV DB -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- ✅ PROD DB -->
+        <!-- PROD DB -->
         <dependency>
             <groupId>org.mariadb.jdbc</groupId>
             <artifactId>mariadb-java-client</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- ✅ TESTING -->
+        <!-- TESTING -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -94,12 +94,12 @@
 
     <build>
 
-        <!-- ✅ FINAL WAR NAME -->
+        <!-- FINAL WAR NAME -->
         <finalName>orderflow-api</finalName>
 
         <plugins>
 
-            <!-- ✅ SPRING BOOT PLUGIN -->
+            <!-- SPRING BOOT PLUGIN -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -109,14 +109,19 @@
                 </configuration>
             </plugin>
 
-            <!-- ✅ UNIT TESTS -->
+            <!-- UNIT TESTS -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven.surefire.plugin.version}</version>
+                <configuration>
+					<systemPropertyVariables>
+				    	<spring.profiles.active>test</spring.profiles.active>
+				    </systemPropertyVariables>
+				</configuration>
             </plugin>
 
-            <!-- ✅ INTEGRATION TESTS -->
+            <!-- INTEGRATION TESTS -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
@@ -131,7 +136,7 @@
                 </executions>
             </plugin>
 
-            <!-- ✅ JACOCO -->
+            <!-- JACOCO -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
