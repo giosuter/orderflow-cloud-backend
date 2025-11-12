@@ -1,7 +1,6 @@
 package ch.devprojects.orderflow.web;
 
 import java.time.Instant;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,17 +12,16 @@ public class PingController {
 
 	@GetMapping("/ping")
 	public ResponseEntity<String> ping() {
-		return ResponseEntity.ok("OrderFlow API is alive - Ping Pang Peng");
+		return ResponseEntity.ok("OrderFlow API is alive - running...");
 	}
-	
-	@GetMapping("/pong")
+
+	@GetMapping("/ping/pong")
 	public ResponseEntity<String> pong() {
-		return ResponseEntity.ok("OrderFlow API is alive - Pong");
+		return ResponseEntity.ok("pong");
 	}
-	
-    // New endpoint that gives you something to change without breaking tests
-    @GetMapping("/ping/time")
-    public String pingTime() {
-        return "ping_the_endpoint_time@" + Instant.now(); // trivial change to generate a new commit
-    }
+
+	@GetMapping("/ping/time")
+	public String pingTime() {
+		return "ping_the_endpoint_time@" + Instant.now();
+	}
 }

@@ -5,7 +5,7 @@ http://localhost:8080/orderflow-api/swagger-ui/index.html<br>
 <br>
 <b><u>Hostpoint:</u></b><br>
 https://devprojects.ch/orderflow-api/api/ping<br>
-https://devprojects.ch/orderflow-api/api/ping<br>
+https://devprojects.ch/orderflow-api/api/pong<br>
 https://devprojects.ch/orderflow-api/api/ping/time<br><br>
 https://devprojects.ch/orderflow-api/actuator/health<br>
 https://devprojects.ch/orderflow-api/actuator/info<br>
