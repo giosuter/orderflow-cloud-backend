@@ -1,48 +1,111 @@
 package ch.devprojects.orderflow.web;
 
-import jakarta.persistence.EntityNotFoundException;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 
 /**
- * IMPORTANT: limit scope to our own web package so we don't catch Springdoc endpoints.
+ * Centralized REST exception mapping. IMPORTANT: Only one generic handler for
+ * Exception to avoid ambiguity.
  */
-@RestControllerAdvice(basePackages = "ch.devprojects.orderflow.web")
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
+	// 404 – entity not found
 	@ExceptionHandler(EntityNotFoundException.class)
-	public ResponseEntity<Map<String, Object>> handleNotFound(EntityNotFoundException ex) {
-		return build(HttpStatus.NOT_FOUND, ex.getMessage());
+	public ResponseEntity<ErrorResponse> handleEntityNotFound(EntityNotFoundException ex, HttpServletRequest req) {
+		return buildError(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), req.getRequestURI());
 	}
 
+	// 400 – unreadable/malformed JSON, enum parse errors, etc.
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	public ResponseEntity<ErrorResponse> handleNotReadable(HttpMessageNotReadableException ex, HttpServletRequest req) {
+		return buildError(HttpStatus.BAD_REQUEST, "Bad Request", rootMessage(ex), req.getRequestURI());
+	}
+
+	// 400 – bean validation on @RequestBody
 	@ExceptionHandler(MethodArgumentNotValidException.class)
-	public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
-		String msg = ex.getBindingResult().getFieldErrors().stream().findFirst()
-				.map(fe -> fe.getField() + ": " + fe.getDefaultMessage()).orElse("Validation error");
-		return build(HttpStatus.UNPROCESSABLE_ENTITY, msg);
+	public ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+			HttpServletRequest req) {
+		List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream().map(this::fieldErrorToMap)
+				.collect(Collectors.toList());
+
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("timestamp", Instant.now());
+		body.put("status", HttpStatus.BAD_REQUEST.value());
+		body.put("error", "Validation Failed");
+		body.put("message", "Request validation failed");
+		body.put("path", req.getRequestURI());
+		body.put("errors", errors);
+
+		return new ResponseEntity<>(body, new HttpHeaders(), HttpStatus.BAD_REQUEST);
 	}
 
+	// 400 – constraint violations on params/path/query (e.g., @Validated on
+	// controllers)
+	@ExceptionHandler(ConstraintViolationException.class)
+	public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex,
+			HttpServletRequest req) {
+		return buildError(HttpStatus.BAD_REQUEST, "Validation Failed", ex.getMessage(), req.getRequestURI());
+	}
+
+	// 409 – unique constraints, FK constraints, etc.
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
+			HttpServletRequest req) {
+		return buildError(HttpStatus.CONFLICT, "Data Integrity Violation", rootMessage(ex), req.getRequestURI());
+	}
+
+	// 400 – illegal arguments from service layer
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest req) {
+		return buildError(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), req.getRequestURI());
+	}
+
+	// 500 – FINAL CATCH-ALL (single method -> no ambiguity)
 	@ExceptionHandler(Exception.class)
-	public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
-		// Generic 500 for our controllers only (springdoc endpoints are excluded by
-		// basePackages)
-		return build(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error");
+	public ResponseEntity<ErrorResponse> handleGeneric(Exception ex, HttpServletRequest req) {
+		// During stabilization, keep this log; remove later if too noisy.
+		ex.printStackTrace();
+		return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "Unexpected error",
+				req.getRequestURI());
 	}
 
-	private ResponseEntity<Map<String, Object>> build(HttpStatus status, String message) {
-		Map<String, Object> body = new HashMap<>();
-		body.put("status", status.value());
-		body.put("error", status.getReasonPhrase());
-		body.put("message", message);
-		body.put("path", ""); // optionally filled by a filter if you like
-		body.put("timestamp", Instant.now().toString());
+	// ----------------- helpers -----------------
+
+	private ResponseEntity<ErrorResponse> buildError(HttpStatus status, String error, String message, String path) {
+		ErrorResponse body = new ErrorResponse(Instant.now(), status.value(), error, message, path);
 		return ResponseEntity.status(status).body(body);
+	}
+
+	private String rootMessage(Throwable ex) {
+		Throwable t = ex;
+		while (t.getCause() != null)
+			t = t.getCause();
+		return t.getMessage() != null ? t.getMessage() : ex.getMessage();
+	}
+
+	private Map<String, String> fieldErrorToMap(FieldError fe) {
+		Map<String, String> m = new LinkedHashMap<>();
+		m.put("field", fe.getField());
+		m.put("rejectedValue", fe.getRejectedValue() == null ? "null" : String.valueOf(fe.getRejectedValue()));
+		m.put("message", fe.getDefaultMessage());
+		return m;
 	}
 }

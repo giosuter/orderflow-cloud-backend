@@ -1,66 +1,60 @@
 package ch.devprojects.orderflow.web;
 
-import ch.devprojects.orderflow.dto.OrderDto;
-import ch.devprojects.orderflow.service.OrderService;
-import jakarta.validation.Valid;
+import java.net.URI;
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import ch.devprojects.orderflow.dto.OrderDto;
+import ch.devprojects.orderflow.service.OrderService;
+import jakarta.validation.Valid;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * OrderController — the REST controller dedicated to Order CRUD
+ * REST controller for Order CRUD. - POST returns 201 Created + Location header
+ * (RFC 9110). - Other endpoints return 200 OK.
  */
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping(path = "/api/orders")
 public class OrderController {
 
-	private final OrderService service;
+	private final OrderService orderService;
 
-	public OrderController(OrderService service) {
-		this.service = service;
+	public OrderController(OrderService orderService) {
+		this.orderService = orderService;
 	}
 
-	// -------------------------------
-	// CREATE
-	// -------------------------------
+	/** Create a new order (201 Created). */
 	@PostMapping
-	public ResponseEntity<OrderDto> create(@Valid @RequestBody OrderDto dto) {
-		OrderDto saved = service.create(dto);
-		return ResponseEntity.ok(saved);
+	public ResponseEntity<OrderDto> create(@Valid @RequestBody OrderDto dto, UriComponentsBuilder uriBuilder) {
+		OrderDto created = orderService.create(dto);
+		URI location = uriBuilder.path("/api/orders/{id}").buildAndExpand(created.getId()).toUri();
+		return ResponseEntity.created(location).body(created); // <-- 201
 	}
 
-	// -------------------------------
-	// UPDATE
-	// -------------------------------
+	/** Get one order by id (200 OK). */
+	@GetMapping("/{id}")
+	public ResponseEntity<OrderDto> getOne(@PathVariable Long id) {
+		return ResponseEntity.ok(orderService.findById(id));
+	}
+
+	/** List all orders (200 OK). */
+	@GetMapping
+	public ResponseEntity<List<OrderDto>> getAll() {
+		return ResponseEntity.ok(orderService.findAll());
+	}
+
+	/** Update an existing order (200 OK). */
 	@PutMapping("/{id}")
 	public ResponseEntity<OrderDto> update(@PathVariable Long id, @Valid @RequestBody OrderDto dto) {
-		OrderDto updated = service.update(id, dto);
-		return ResponseEntity.ok(updated);
+		return ResponseEntity.ok(orderService.update(id, dto));
 	}
 
-	// -------------------------------
-	// GET ALL
-	// -------------------------------
-	@GetMapping
-	public ResponseEntity<List<OrderDto>> findAll() {
-		return ResponseEntity.ok(service.findAll());
-	}
-
-	// -------------------------------
-	// GET BY ID
-	// -------------------------------
-	@GetMapping("/{id}")
-	public ResponseEntity<OrderDto> findById(@PathVariable Long id) {
-		return ResponseEntity.ok(service.findById(id));
-	}
-
-	// -------------------------------
-	// DELETE
-	// -------------------------------
+	/** Delete an order (204 No Content). */
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
-		service.delete(id);
+		orderService.delete(id);
 		return ResponseEntity.noContent().build();
 	}
 }

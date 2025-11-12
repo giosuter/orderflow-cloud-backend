@@ -3,45 +3,65 @@ package ch.devprojects.orderflow.web;
 import java.time.Instant;
 
 /**
- * Simple API error payload.
+ * Simple error payload used by GlobalExceptionHandler. Kept in the same package
+ * (web) per your project preference.
  */
 public class ErrorResponse {
-	private final Instant timestamp;
-	private final int status;
-	private final String error;
-	private final String message;
-	private final String path;
 
-	public ErrorResponse(int status, String error, String message, String path) {
-		this.timestamp = Instant.now();
+	private Instant timestamp;
+	private int status;
+	private String error;
+	private String message;
+	private String path;
+
+	public ErrorResponse() {
+	}
+
+	public ErrorResponse(Instant timestamp, int status, String error, String message, String path) {
+		this.timestamp = timestamp;
 		this.status = status;
 		this.error = error;
 		this.message = message;
 		this.path = path;
 	}
 
-	/** Optional factory for convenience. */
-	public static ErrorResponse of(int status, String error, String message, String path) {
-		return new ErrorResponse(status, error, message, path);
-	}
-
 	public Instant getTimestamp() {
 		return timestamp;
+	}
+
+	public void setTimestamp(Instant timestamp) {
+		this.timestamp = timestamp;
 	}
 
 	public int getStatus() {
 		return status;
 	}
 
+	public void setStatus(int status) {
+		this.status = status;
+	}
+
 	public String getError() {
 		return error;
+	}
+
+	public void setError(String error) {
+		this.error = error;
 	}
 
 	public String getMessage() {
 		return message;
 	}
 
+	public void setMessage(String message) {
+		this.message = message;
+	}
+
 	public String getPath() {
 		return path;
+	}
+
+	public void setPath(String path) {
+		this.path = path;
 	}
 }

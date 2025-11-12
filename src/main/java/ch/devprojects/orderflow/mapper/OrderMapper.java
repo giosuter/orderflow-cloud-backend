@@ -1,16 +1,14 @@
 package ch.devprojects.orderflow.mapper;
 
-import org.springframework.stereotype.Component;
+import java.time.Instant;
 
 import ch.devprojects.orderflow.domain.Order;
 import ch.devprojects.orderflow.dto.OrderDto;
 
-/*
- * DTO uses strings for frontend compatibility.
- * Entity uses enums for safer persistence.
+/**
+ * Manual mapper between JPA entity and API DTO. Option 1: 'customerName' is
+ * DTO-only and ignored here.
  */
-
-@Component
 public class OrderMapper {
 
 	public OrderDto toDto(Order entity) {
@@ -19,8 +17,8 @@ public class OrderMapper {
 		OrderDto dto = new OrderDto();
 		dto.setId(entity.getId());
 		dto.setCode(entity.getCode());
-		dto.setStatus(entity.getStatus().name());
-		dto.setTotal(entity.getTotal()); // <<— map total
+		dto.setStatus(entity.getStatus()); // enum OK now
+		dto.setTotal(entity.getTotal());
 		dto.setCreatedAt(entity.getCreatedAt());
 		dto.setUpdatedAt(entity.getUpdatedAt());
 		return dto;
@@ -31,22 +29,39 @@ public class OrderMapper {
 			return null;
 		Order entity = new Order();
 		entity.setCode(dto.getCode());
-		if (dto.getStatus() != null) {
-			entity.setStatus(Order.Status.valueOf(dto.getStatus()));
-		}
-		entity.setTotal(dto.getTotal()); // <<— map total
+		entity.setStatus(dto.getStatus()); // enum OK now
+		entity.setTotal(dto.getTotal());
+		if (dto.getCreatedAt() != null)
+			entity.setCreatedAt(dto.getCreatedAt());
+		if (dto.getUpdatedAt() != null)
+			entity.setUpdatedAt(dto.getUpdatedAt());
 		return entity;
 	}
 
-	public void updateEntity(Order entity, OrderDto dto) {
-		if (dto.getCode() != null) {
+	public void updateEntityFromDto(OrderDto dto, Order entity) {
+		if (dto == null || entity == null)
+			return;
+		boolean changed = false;
+
+		if (dto.getCode() != null && !dto.getCode().equals(entity.getCode())) {
 			entity.setCode(dto.getCode());
+			changed = true;
 		}
-		if (dto.getStatus() != null) {
-			entity.setStatus(Order.Status.valueOf(dto.getStatus()));
+		if (dto.getStatus() != null && dto.getStatus() != entity.getStatus()) {
+			entity.setStatus(dto.getStatus());
+			changed = true;
 		}
-		if (dto.getTotal() != null) {
-			entity.setTotal(dto.getTotal()); // <<— map total
+		if (dto.getTotal() != null && (entity.getTotal() == null || dto.getTotal().compareTo(entity.getTotal()) != 0)) {
+			entity.setTotal(dto.getTotal());
+			changed = true;
+		}
+		if (dto.getCreatedAt() != null && !dto.getCreatedAt().equals(entity.getCreatedAt())) {
+			entity.setCreatedAt(dto.getCreatedAt());
+			changed = true;
+		}
+
+		if (changed) {
+			entity.setUpdatedAt(Instant.now());
 		}
 	}
 }

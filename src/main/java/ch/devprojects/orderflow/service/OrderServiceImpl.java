@@ -1,60 +1,118 @@
 package ch.devprojects.orderflow.service;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import ch.devprojects.orderflow.domain.Order;
+import ch.devprojects.orderflow.domain.OrderStatus;
 import ch.devprojects.orderflow.dto.OrderDto;
 import ch.devprojects.orderflow.mapper.OrderMapper;
 import ch.devprojects.orderflow.repository.OrderRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
+/**
+ * OrderServiceImpl — business/service layer for Orders. - Keeps controllers
+ * thin - Centralizes validation, defaults, timestamps, and mapping - No Lombok
+ */
 @Service
 @Transactional
 public class OrderServiceImpl implements OrderService {
 
-	private final OrderRepository repo;
-	private final OrderMapper mapper;
+	private final OrderRepository orderRepository;
+	private final OrderMapper orderMapper = new OrderMapper(); // simple manual mapper
 
-	public OrderServiceImpl(OrderRepository repo, OrderMapper mapper) {
-		this.repo = repo;
-		this.mapper = mapper;
+	public OrderServiceImpl(OrderRepository orderRepository) {
+		this.orderRepository = orderRepository;
 	}
 
+	// -------------------------------
+	// CREATE
+	// -------------------------------
 	@Override
 	public OrderDto create(OrderDto dto) {
-		Order entity = mapper.toEntity(dto);
-		repo.save(entity);
-		return mapper.toDto(entity);
+		Objects.requireNonNull(dto, "OrderDto must not be null");
+
+		// Minimal guard rails (Bean Validation on the DTO will also run in the
+		// controller)
+		if (dto.getCode() == null || dto.getCode().isBlank()) {
+			throw new IllegalArgumentException("code must not be blank");
+		}
+		if (dto.getTotal() == null) {
+			throw new IllegalArgumentException("total must not be null");
+		}
+
+		Order entity = orderMapper.toEntity(dto);
+
+		// Defaults (Option 1): if status is not provided, use NEW
+		if (entity.getStatus() == null) {
+			entity.setStatus(OrderStatus.NEW);
+		}
+
+		// Initialize timestamps if missing
+		Instant now = Instant.now();
+		if (entity.getCreatedAt() == null) {
+			entity.setCreatedAt(now);
+		}
+		entity.setUpdatedAt(now);
+
+		Order saved = orderRepository.save(entity);
+		return orderMapper.toDto(saved);
 	}
 
+	// -------------------------------
+	// READ (by id)
+	// -------------------------------
+	@Override
+	@Transactional(readOnly = true)
+	public OrderDto findById(Long id) {
+		Order found = orderRepository.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Order not found: " + id));
+		return orderMapper.toDto(found);
+	}
+
+	// -------------------------------
+	// READ (all)
+	// -------------------------------
+	@Override
+	@Transactional(readOnly = true)
+	public List<OrderDto> findAll() {
+		return orderRepository.findAll().stream().map(orderMapper::toDto).collect(Collectors.toList());
+	}
+
+	// -------------------------------
+	// UPDATE (partial, null-safe)
+	// -------------------------------
 	@Override
 	public OrderDto update(Long id, OrderDto dto) {
-		Order entity = repo.findById(id).orElseThrow(() -> new EntityNotFoundException("Order not found: " + id));
+		Objects.requireNonNull(dto, "OrderDto must not be null");
+		Order existing = orderRepository.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Order not found: " + id));
 
-		mapper.updateEntity(entity, dto);
-		repo.save(entity);
+		// In-place update, ignoring nulls; updatedAt is set if something changed
+		orderMapper.updateEntityFromDto(dto, existing);
 
-		return mapper.toDto(entity);
+		// Ensure status is never null after update
+		if (existing.getStatus() == null) {
+			existing.setStatus(OrderStatus.NEW);
+		}
+
+		Order saved = orderRepository.save(existing);
+		return orderMapper.toDto(saved);
 	}
 
-	@Override
-	public List<OrderDto> findAll() {
-		return repo.findAll().stream().map(mapper::toDto).toList();
-	}
-
-	@Override
-	public OrderDto findById(Long id) {
-		Order entity = repo.findById(id).orElseThrow(() -> new EntityNotFoundException("Order not found: " + id));
-		return mapper.toDto(entity);
-	}
-
+	// -------------------------------
+	// DELETE
+	// -------------------------------
 	@Override
 	public void delete(Long id) {
-		if (!repo.existsById(id)) {
+		if (!orderRepository.existsById(id)) {
 			throw new EntityNotFoundException("Order not found: " + id);
 		}
-		repo.deleteById(id);
+		orderRepository.deleteById(id);
 	}
 }
