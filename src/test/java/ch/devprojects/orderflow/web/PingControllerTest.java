@@ -1,28 +1,36 @@
 package ch.devprojects.orderflow.web;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-
-import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@AutoConfigureMockMvc(addFilters = false) // disable security filters for these tests
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+/**
+ * Lightweight unit test for PingController.
+ *
+ * Uses standalone MockMvc: no Spring Boot context, no DB, no Flyway, no Spring
+ * Security, no SpringDoc – just the controller itself.
+ */
 class PingControllerTest {
 
-	@Autowired
 	private MockMvc mockMvc;
+
+	@BeforeEach
+	void setUp() {
+		// Create a real PingController instance
+		PingController controller = new PingController();
+		// Build MockMvc around that controller only
+		this.mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+	}
 
 	@Test
 	void ping_shouldReturnExactAliveMessage() throws Exception {
 		mockMvc.perform(get("/api/ping")).andExpect(status().isOk())
-				.andExpect(content().string("OrderFlow API is alive - running..."));
+				.andExpect(content().string("OrderFlow API is alive - Giovanni Suter copyright - running..."));
 	}
 
 	@Test
@@ -33,6 +41,7 @@ class PingControllerTest {
 	@Test
 	void pingTime_shouldReturnTimestampPrefix() throws Exception {
 		mockMvc.perform(get("/api/ping/time")).andExpect(status().isOk())
-				.andExpect(content().string(startsWith("ping_the_endpoint_time@")));
+				// We only check the prefix; the timestamp itself is dynamic
+				.andExpect(content().string(org.hamcrest.Matchers.startsWith("ping_the_endpoint_time@")));
 	}
 }

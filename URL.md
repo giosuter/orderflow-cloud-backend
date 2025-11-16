@@ -1,9 +1,14 @@
 <b><u>localhost:</u></b><br>
-http://localhost:8080/orderflow-api/api/ping<br>
-http://localhost:8080/orderflow-api/actuator/health<br>
-http://localhost:8080/orderflow-api/swagger-ui/index.html<br>
-<br>
+
+<table>
+
+</table>
+[http://localhost:8080/orderflow-api/api/ping](http://localhost:8080/orderflow-api/api/ping)<br>
+[http://localhost:8080/orderflow-api/actuator/health](http://localhost:8080/orderflow-api/actuator/health)<br>
+[http://localhost:8080/orderflow-api/swagger-ui/index.html](http://localhost:8080/orderflow-api/swagger-ui/index.html)<br><br>
 <b><u>Hostpoint:</u></b><br>
+<br>
+
 https://devprojects.ch/orderflow-api/api/ping<br>
 https://devprojects.ch/orderflow-api/api/pong<br>
 https://devprojects.ch/orderflow-api/api/ping/time<br><br>
@@ -15,3 +20,6 @@ https://devprojects.ch/orderflow-api/v3/api-docs/swagger-config<br><br>
 https://devprojects.ch/orderflow-api/swagger-ui/index.html<br>
 https://devprojects.ch/orderflow-api/swagger-ui/swagger-ui.css<br>
 https://devprojects.ch/orderflow-api/swagger-ui/swagger-ui-bundle.js<br><br>
+
+
+[http://localhost:8080/orderflow-api/api/ping](http://localhost:8080/orderflow-api/api/ping)
