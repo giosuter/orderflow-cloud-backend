@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api")
 public class PingController {
 	
-	public static final String PING_MESSAGE = "OrderFlow API is alive - v2.2";
+	public static final String PING_MESSAGE = "OrderFlow API is alive - v2.3";
 
 
 	@GetMapping("/ping")
