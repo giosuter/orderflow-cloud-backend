@@ -30,7 +30,7 @@ class PingControllerTest {
 	@Test
 	void ping_shouldReturnExactAliveMessage() throws Exception {
 		mockMvc.perform(get("/api/ping")).andExpect(status().isOk())
-				.andExpect(content().string("OrderFlow API is alive - Giovanni Suter - using default message"));
+				.andExpect(content().string("OrderFlow API is alive - v2"));
 	}
 
 	@Test
