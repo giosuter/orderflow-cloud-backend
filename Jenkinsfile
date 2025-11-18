@@ -1,3 +1,6 @@
+// File: Jenkinsfile  (orderflow-cloud-backend)
+// Purpose: Build + test + copy WAR to Hostpoint (with H2 prod config)
+
 pipeline {
   agent any
 
@@ -10,7 +13,6 @@ pipeline {
     timestamps()
     buildDiscarder(logRotator(numToKeepStr: '20'))
     disableConcurrentBuilds()
-    // NOTE: no ansiColor/wrap here — your Jenkins doesn't support them in options
   }
 
   triggers {
@@ -18,13 +20,26 @@ pipeline {
   }
 
   environment {
-    GIT_CREDENTIALS_ID = 'github-giosuter' // keep if your repo needs auth
+    // GitHub credentials (already configured in your Jenkins)
+    GIT_CREDENTIALS_ID = 'github-giosuter'
+
+    // Hostpoint deploy settings
+    HOSTPOINT_USER = 'zitatusi'
+    HOSTPOINT_HOST = 'zitatusi.myhostpoint.ch'
+    REMOTE_TOMCAT_DIR = '/home/zitatusi/app/tools/tomcat/apache-tomcat-10.1.33'
+
+    // Name of the built WAR (from pom.xml: <finalName>orderflow-api</finalName>)
+    WAR_NAME = 'orderflow-api.war'
   }
 
   stages {
-	stage('Marker') {
-      steps { echo 'JENKINSFILE_MARKER: v-no-ansiwrap-001' }
+
+    stage('Marker') {
+      steps {
+        echo 'JENKINSFILE_MARKER: orderflow-v1-build-and-copy'
+      }
     }
+
     stage('Checkout') {
       steps {
         checkout([
@@ -40,18 +55,14 @@ pipeline {
 
     stage('Verify tool versions') {
       steps {
-        ansiColor('xterm') {
-          sh 'java -version'
-          sh 'mvn -version'
-        }
+        sh 'java -version || true'
+        sh 'mvn -version || true'
       }
     }
 
     stage('Build & Test') {
       steps {
-        ansiColor('xterm') {
-          sh 'mvn -B -U -DskipTests=false clean verify'
-        }
+        sh 'mvn -B -U clean verify'
       }
       post {
         always {
@@ -65,28 +76,40 @@ pipeline {
               echo 'No JaCoCo exec file found.'
             }
           }
-          publishHTML(target: [
-            reportDir: 'target/site/jacoco',
-            reportFiles: 'index.html',
-            reportName: 'JaCoCo_Coverage',
-            keepAll: true,
-            alwaysLinkToLastBuild: true
-          ])
           archiveArtifacts artifacts: 'target/*.war, target/site/**', fingerprint: true, onlyIfSuccessful: false
         }
       }
     }
 
-    stage('Quality Gate (soft)') {
+    stage('Deploy WAR to Hostpoint (copy only)') {
+      when {
+        branch 'main'
+      }
       steps {
-        echo 'Add a hard coverage threshold once domain tests are in (e.g., fail if < 75%).'
+        sh '''
+          echo "Checking for built WAR..."
+          ls -l target || true
+
+          if [ ! -f "target/${WAR_NAME}" ]; then
+            echo "ERROR: target/${WAR_NAME} not found. Build may have failed."
+            exit 1
+          fi
+
+          echo "Copying WAR to Hostpoint..."
+          scp -o StrictHostKeyChecking=no "target/${WAR_NAME}" \
+            "${HOSTPOINT_USER}@${HOSTPOINT_HOST}:${REMOTE_TOMCAT_DIR}/webapps/${WAR_NAME}"
+
+          echo "WAR copied to Hostpoint:"
+          echo "  ${REMOTE_TOMCAT_DIR}/webapps/${WAR_NAME}"
+          echo "Bitte Tomcat auf Hostpoint manuell per supervisorctl neu starten."
+        '''
       }
     }
   }
 
   post {
-    success  { echo 'Build green.' }
-    unstable { echo 'Unstable: check tests/coverage.' }
-    failure  { echo 'Build failed.' }
+    success  { echo 'OrderFlow build + copy to Hostpoint: SUCCESS' }
+    unstable { echo 'OrderFlow pipeline UNSTABLE – bitte Tests/Coverage prüfen.' }
+    failure  { echo 'OrderFlow pipeline FAILED – bitte Jenkins-Logs ansehen.' }
   }
 }
