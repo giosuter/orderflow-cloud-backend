@@ -1,5 +1,7 @@
 package ch.devprojects.orderflow.web;
 
+
+import static ch.devprojects.orderflow.web.PingController.PING_MESSAGE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -30,7 +32,7 @@ class PingControllerTest {
 	@Test
 	void ping_shouldReturnExactAliveMessage() throws Exception {
 		mockMvc.perform(get("/api/ping")).andExpect(status().isOk())
-				.andExpect(content().string("OrderFlow API is alive - v2.1"));
+				.andExpect(content().string(PING_MESSAGE));
 	}
 
 	@Test

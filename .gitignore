@@ -36,3 +36,5 @@ bin/
 # -------------------------
 node_modules/
 dist/
+
+Jenkinsfile.backup
