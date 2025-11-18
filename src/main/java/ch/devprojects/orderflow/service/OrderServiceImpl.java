@@ -151,4 +151,17 @@ public class OrderServiceImpl implements OrderService {
                 .map(orderMapper::toDto)
                 .collect(Collectors.toList());
     }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public OrderDto findByCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code must not be blank");
+        }
+
+        Order found = orderRepository.findByCodeIgnoreCase(code)
+                .orElseThrow(() -> new EntityNotFoundException("Order not found with code: " + code));
+
+        return orderMapper.toDto(found);
+    }
 }

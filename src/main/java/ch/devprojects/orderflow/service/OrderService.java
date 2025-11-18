@@ -58,4 +58,6 @@ public interface OrderService {
      * @return list of matching orders (possibly empty)
      */
     List<OrderDto> search(String code, OrderStatus status);
+    
+    OrderDto findByCode(String code);
 }

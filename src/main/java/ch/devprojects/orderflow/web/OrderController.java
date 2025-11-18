@@ -90,4 +90,9 @@ public class OrderController {
     //  - There is intentionally NO /search endpoint here anymore.
     //  - Search is moved into OrderSearchController to avoid ambiguous
     //    mappings and to keep concerns separated.
+    
+    @GetMapping("/code/{code}")
+    public ResponseEntity<OrderDto> getByCode(@PathVariable String code) {
+        return ResponseEntity.ok(orderService.findByCode(code));
+    }
 }

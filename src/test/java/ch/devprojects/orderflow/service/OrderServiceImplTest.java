@@ -15,6 +15,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -35,7 +36,7 @@ import jakarta.persistence.EntityNotFoundException;
  * Focus:
  *  - Exercise business logic and mapping in the service layer.
  *  - Uses a mocked OrderRepository (no database, no Flyway).
- *  - Uses the real OrderMapper for entity <-> DTO mapping.
+ *  - Uses the real OrderMapper indirectly via OrderServiceImpl.
  *
  * Covered scenarios:
  *  - create: happy path + validation failures
@@ -44,6 +45,7 @@ import jakarta.persistence.EntityNotFoundException;
  *  - update: existing + missing
  *  - delete: existing + missing
  *  - search: different combinations of code/status filters
+ *  - findByCode: existing + missing
  */
 @ExtendWith(MockitoExtension.class)
 public class OrderServiceImplTest {
@@ -51,7 +53,9 @@ public class OrderServiceImplTest {
     @Mock
     private OrderRepository orderRepository;
 
-    // We use the real mapper; it's simple and deterministic.
+    // Not used directly in tests but kept for documentation:
+    // the service internally uses a simple manual OrderMapper.
+    @SuppressWarnings("unused")
     private OrderMapper orderMapper;
 
     private OrderServiceImpl orderService;
@@ -337,5 +341,44 @@ public class OrderServiceImplTest {
         // Even though we don't inspect the Specification, this line ensures
         // that the Specification-based path in OrderServiceImpl is executed.
         verify(orderRepository).findAll(any(Specification.class));
+    }
+
+    // -------------------------------------------------------------------------
+    // FIND BY CODE
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("findByCode")
+    class FindByCodeTests {
+
+        @Test
+        @DisplayName("findByCode() should return DTO when the order exists")
+        void findByCode_shouldReturnDto_whenOrderExists() {
+            Order o = new Order();
+            o.setId(10L);
+            o.setCode("ABC123");
+
+            when(orderRepository.findByCodeIgnoreCase("ABC123"))
+                    .thenReturn(Optional.of(o));
+
+            OrderDto dto = orderService.findByCode("ABC123");
+
+            assertNotNull(dto);
+            assertEquals(10L, dto.getId());
+            assertEquals("ABC123", dto.getCode());
+        }
+
+        @Test
+        @DisplayName("findByCode() should throw EntityNotFoundException when the order does not exist")
+        void findByCode_shouldThrowNotFound_whenMissing() {
+            when(orderRepository.findByCodeIgnoreCase("NOPE"))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(
+                    EntityNotFoundException.class,
+                    () -> orderService.findByCode("NOPE"),
+                    "Missing order code must trigger EntityNotFoundException"
+            );
+        }
     }
 }
