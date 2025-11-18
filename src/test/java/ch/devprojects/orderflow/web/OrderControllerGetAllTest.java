@@ -13,7 +13,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,15 +33,16 @@ import ch.devprojects.orderflow.service.OrderService;
 @WebMvcTest(OrderController.class)
 class OrderControllerGetAllTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
     /**
      * The controller depends on OrderService. Here we mock it so that
      * we can fully control the returned data and keep the test fast.
      */
-    @MockBean
+
+    @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private MockMvc mockMvc;
 
     @Test
     @DisplayName("GET /api/orders should return 200 and a JSON array of orders")

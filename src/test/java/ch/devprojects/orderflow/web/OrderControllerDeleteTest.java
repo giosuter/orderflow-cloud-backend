@@ -8,16 +8,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import jakarta.persistence.EntityNotFoundException;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import ch.devprojects.orderflow.service.OrderService;
+import jakarta.persistence.EntityNotFoundException;
 
 /**
  * Web slice tests for the DELETE endpoint in {@link OrderController}.
@@ -35,15 +33,15 @@ import ch.devprojects.orderflow.service.OrderService;
 @WebMvcTest(OrderController.class)
 class OrderControllerDeleteTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
     /**
      * The controller depends on OrderService; here we mock it 
      * so we can simulate success and failure scenarios very quickly.
      */
-    @MockBean
+    @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private MockMvc mockMvc;
 
     @Test
     @DisplayName("DELETE /api/orders/{id} should return 204 when deletion succeeds")
