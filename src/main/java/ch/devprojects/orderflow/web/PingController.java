@@ -12,7 +12,7 @@ public class PingController {
 
 	@GetMapping("/ping")
 	public ResponseEntity<String> ping() {
-		return ResponseEntity.ok("OrderFlow API is alive - v2");
+		return ResponseEntity.ok("OrderFlow API is alive - v2.1");
 	}
 
 	@GetMapping("/ping/pong")
