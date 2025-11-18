@@ -82,9 +82,9 @@ pipeline {
     }
 
     stage('Deploy WAR to Hostpoint (copy only)') {
-      when {
-        branch 'main'
-      }
+//      when {
+//        branch 'main'
+//      }
       steps {
         sh '''
           echo "Checking for built WAR..."
