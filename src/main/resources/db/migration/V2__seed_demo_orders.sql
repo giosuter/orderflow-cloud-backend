@@ -1,6 +1,6 @@
 -- V2__seed_demo_orders.sql
 -- Demo data for OrderFlow dev/test environment.
--- Keep data simple and neutral – useful to show CRUD to customers/headhunters.
+-- Keep data simple and neutral – useful to show CRUD operations.
 
 INSERT INTO orders (code, status, total)
 VALUES

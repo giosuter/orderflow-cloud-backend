@@ -230,3 +230,23 @@ It is explicitly built to show recruiters and companies:
 Email: *giovanni.suter@me.com*  
 GitHub: https://github.com/giosuter  
 Portfolio: https://devprojects.ch  
+
+---
+
+# 10. Database migrations & seed data
+
+The backend uses Flyway for schema and data migrations:
+
+- Location: `src/main/resources/db/migration`
+- Example:
+  - `V1__init_order_table.sql` – creates the `orders` table.
+  - `V2__seed_demo_orders.sql` – inserts a few demo orders for dev/test.
+
+Additional helper scripts live under `sql-scripts/`:
+
+- `sql-scripts/dev/orderflow-dev-reset-and-seed.sql`
+  - Manual reset + seed for the dev database (H2 or MariaDB).
+  - Can be executed from DBeaver or the DB console.
+
+On startup (dev profile), Flyway automatically runs all `V*.sql` migrations
+against the configured datasource.
