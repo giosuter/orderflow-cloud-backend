@@ -6,6 +6,12 @@
 [http://localhost:8080/orderflow-api/api/ping](http://localhost:8080/orderflow-api/api/ping)<br>
 [http://localhost:8080/orderflow-api/actuator/health](http://localhost:8080/orderflow-api/actuator/health)<br>
 [http://localhost:8080/orderflow-api/swagger-ui/index.html](http://localhost:8080/orderflow-api/swagger-ui/index.html)<br><br>
+
+H2:
+http://localhost:8080/orderflow-api/h2-console
+[http://localhost:8080/orderflow-api/h2-console](http://localhost:8080/orderflow-api/h2-console)<br>
+or<br>
+http://localhost:8080/orderflow-api/h2-console?jdbcUrl=jdbc:h2:mem:orderflow_dev;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
 <b><u>Hostpoint:</u></b><br>
 <br>
 

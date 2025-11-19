@@ -250,3 +250,21 @@ Additional helper scripts live under `sql-scripts/`:
 
 On startup (dev profile), Flyway automatically runs all `V*.sql` migrations
 against the configured datasource.
+
+---
+
+# 11. API quickstart (dev)
+
+Base URL (dev):
+- `http://localhost:8080/orderflow-api`
+
+Example endpoints:
+- `GET /api/ping` – simple health check.
+- `GET /api/orders` – list all orders (uses Flyway seed data from V2).
+- `GET /api/orders/{id}` – get a single order.
+- `GET /api/orders/search?code=ORD&status=NEW` – search orders by code + status.
+
+Example curl:
+
+```bash
+curl -i http://localhost:8080/orderflow-api/api/orders
