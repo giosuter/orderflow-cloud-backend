@@ -43,7 +43,7 @@ class PingControllerTest {
 	@Test
 	void pingTime_shouldReturnTimestampPrefix() throws Exception {
 		mockMvc.perform(get("/api/ping/time")).andExpect(status().isOk())
-				// We only check the prefix; the timestamp itself is dynamic
+				// Only check the prefix; the timestamp itself is dynamic
 				.andExpect(content().string(org.hamcrest.Matchers.startsWith("ping_the_endpoint_time@")));
 	}
 }

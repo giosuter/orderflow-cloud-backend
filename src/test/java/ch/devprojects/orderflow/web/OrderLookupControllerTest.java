@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import ch.devprojects.orderflow.domain.OrderStatus;
@@ -24,17 +25,44 @@ import jakarta.persistence.EntityNotFoundException;
 /**
  * Web slice tests for {@link OrderLookupController}.
  *
- * Focus: - Verify that GET /api/orders/by-code/{code}: * delegates to
- * OrderService.findByCode(...) * returns 200 OK with the expected JSON payload
- * when the order exists * returns 404 NOT FOUND when the service throws
- * EntityNotFoundException
+ * <p>
+ * Focus:
+ * </p>
+ * <ul>
+ * <li>Verify that GET /api/orders/by-code/{code}:</li>
+ * <li>delegates to {@link OrderService#findByCode(String)}</li>
+ * <li>returns 200 OK with the expected JSON payload when the order exists</li>
+ * <li>returns 404 Not Found when the service throws
+ * {@link EntityNotFoundException}</li>
+ * </ul>
+ *
+ * <p>
+ * The test exercises only the web layer. The {@link OrderService} is replaced
+ * by a Mockito-based mock, so we can precisely control the behaviour without
+ * touching the database.
+ * </p>
  */
 @WebMvcTest(OrderLookupController.class)
 class OrderLookupControllerTest {
 
-    @Autowired
-    private OrderService orderService;
-    
+	/**
+	 * Mockito-based mock of {@link OrderService} for this web slice test.
+	 *
+	 * <p>
+	 * In a {@link WebMvcTest} context, service beans are not created by default.
+	 * {@link MockitoBean} ensures that the controller under test can be constructed
+	 * with a valid {@link OrderService} dependency while still allowing us to
+	 * control its behaviour via Mockito.
+	 * </p>
+	 */
+	@MockitoBean
+	private OrderService orderService;
+
+	/**
+	 * {@link MockMvc} simulates HTTP requests to the controller without starting a
+	 * real servlet container. This keeps the tests fast while still exercising the
+	 * full Spring MVC stack.
+	 */
 	@Autowired
 	private MockMvc mockMvc;
 
@@ -76,6 +104,6 @@ class OrderLookupControllerTest {
 		// Act + Assert
 		mockMvc.perform(get("/api/orders/by-code/{code}", code).accept(MediaType.APPLICATION_JSON))
 				.andExpect(status().isNotFound());
-		// Details of the error body are handled/covered by GlobalExceptionHandlerTest
+		// Details of the error body are covered by GlobalExceptionHandler tests.
 	}
 }

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import ch.devprojects.orderflow.domain.OrderStatus;
@@ -22,23 +23,46 @@ import ch.devprojects.orderflow.service.OrderService;
 /**
  * Web slice test for {@link OrderController}.
  *
- * Focus: - Verify that GET /api/orders/{id}: * delegates to
- * OrderService.findById(...) * returns 200 OK with the expected JSON payload
- * 
- * This test: - increases coverage on the happy path of getOne(...) - does NOT
- * require a real database or Flyway (OrderService is mocked) - protects the
- * external REST contract (JSON structure, HTTP status)
+ * <p>
+ * Focus:
+ * </p>
+ * <ul>
+ * <li>Verify that GET /api/orders/{id}:</li>
+ * <li>delegates to {@link OrderService#findById(Long)}</li>
+ * <li>returns 200 OK with the expected JSON payload</li>
+ * </ul>
+ *
+ * <p>
+ * This test:
+ * </p>
+ * <ul>
+ * <li>increases coverage on the happy path of {@code getOne(...)};</li>
+ * <li>does not require a real database or Flyway (the {@link OrderService} is
+ * mocked);</li>
+ * <li>protects the external REST contract (JSON structure, HTTP status).</li>
+ * </ul>
  */
 @WebMvcTest(OrderController.class)
 class OrderControllerGetOneTest {
 
 	/**
-	 * Mock the service layer because in a web slice test we want to verify only
-	 * controller behavior and JSON mapping, not persistence.
+	 * Mockito-based mock of {@link OrderService} for this web slice test.
+	 *
+	 * <p>
+	 * In a {@link WebMvcTest} context, service beans are not created by default.
+	 * {@link MockitoBean} ensures that the controller under test can be constructed
+	 * with a valid {@link OrderService} dependency while still allowing us to
+	 * control its behaviour via Mockito.
+	 * </p>
 	 */
-	@Autowired
+	@MockitoBean
 	private OrderService orderService;
 
+	/**
+	 * {@link MockMvc} simulates HTTP requests to the controller without starting a
+	 * real servlet container. This keeps the tests fast while still exercising the
+	 * full Spring MVC stack (routing, JSON mapping, etc.).
+	 */
 	@Autowired
 	private MockMvc mockMvc;
 
@@ -57,9 +81,9 @@ class OrderControllerGetOneTest {
 		when(orderService.findById(id)).thenReturn(dto);
 
 		// Act + Assert: call the endpoint and verify the JSON response
-		mockMvc.perform(get("/api/orders/{id}", id).accept(MediaType.APPLICATION_JSON)).andExpect(status().isOk())
+		mockMvc.perform(get("/api/orders/{id}", id).accept(MediaType.APPLICATION_JSON))
 				// Controller returns JSON, we check content type and a few fields
-				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+				.andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
 				.andExpect(jsonPath("$.id").value(id.intValue())).andExpect(jsonPath("$.code").value("ORD-42"))
 				.andExpect(jsonPath("$.status").value("NEW")).andExpect(jsonPath("$.total").value(123.45));
 	}

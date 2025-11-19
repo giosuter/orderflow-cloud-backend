@@ -1,178 +1,232 @@
-OrderFlow Cloud – Backend
+# OrderFlow Cloud – Enterprise-Grade Order Management API  
+### Spring Boot 3.5 · Java 21 · Tomcat 10.1 · Flyway · Swagger UI · Jenkins Ready
 
-Spring Boot 3.5.x · Java 21 · Maven · H2 (file-based) · Springdoc OpenAPI · Jenkins CI
-Context path: /orderflow-api
+OrderFlow Cloud is a **clean, production-ready**, backend service that manages orders with full CRUD, search, validation, and test coverage.  
+It is designed as a **professional showcase project** demonstrating enterprise engineering skills:
 
-⸻
+- modern Spring Boot 3 architecture  
+- layered domain/service/controller structure  
+- clean mapper and specification patterns  
+- strong testing discipline (unit + integration)  
+- WAR deployment on Tomcat  
+- Flyway-based database versioning  
+- OpenAPI/Swagger contract  
+- CI/CD-ready structure (Jenkins pipelines)
 
-1. Project Overview
+This project is deployed and running on a **real production server**, publicly accessible:
 
-OrderFlow Cloud Backend provides a clean REST API for managing Orders, including:
-	•	CRUD operations
-	•	DTO + Mapper
-	•	Service layer
-	•	Global exception handling
-	•	Integration tests using MockMvc (OrderControllerIT)
-	•	Automatic OpenAPI 3 documentation (Swagger UI)
+**🔗 Production API:** https://devprojects.ch/orderflow-api/api/ping  
+**🔗 Swagger UI:** https://devprojects.ch/orderflow-api/swagger-ui/index.html  
+**🔗 Actuator Health:** https://devprojects.ch/orderflow-api/actuator/health  
+**🔗 JaCoCo Report:** https://devprojects.ch/orderflow-api/jacoco/index.html  
 
-⸻
+---
 
-2. Technologies
+# 1. Features
 
-Technology	Version	Notes
-Java	21	Required
-Spring Boot	3.5.x	Using Boot parent
-Maven	3.9+	Build + tests
-H2	file-based	Stored under ~/.orderflow/data
-Flyway	v1 migration	Creates ORDER table
-Springdoc	2.6.0	OpenAPI 3 documentation
-Jenkins	configured	Builds + runs tests
+### ✔ Complete CRUD for Orders  
+- Create, read, update, delete  
+- Validation (code, status, totals)  
+- Automatic timestamping (createdAt, updatedAt)
 
+### ✔ Advanced Search  
+- Search by code  
+- Search by status  
+- Combined filters  
+- Implementation uses Spring Data JPA **Specification Pattern**
 
-⸻
+### ✔ Clean Architecture  
+- Domain model: `Order`  
+- DTO: `OrderDto`  
+- Repository: `OrderRepository`  
+- Service layer with business logic  
+- Manual `OrderMapper` for deterministic mapping  
+- Thin REST controller (no business logic)
 
-3. Local Run
+### ✔ Database Ready  
+- Flyway migrations (V1 and ready for V2+)  
+- MariaDB (production)  
+- H2 (development/testing)
 
-Start with:
+### ✔ Professional Deployment  
+- WAR packaged  
+- Hosted on Tomcat 10.1  
+- Reverse-proxy-ready via Hostpoint (FreeBSD-based Nginx + Tomcat)
 
-./mvnw clean install
-./mvnw spring-boot:run
+### ✔ Documentation  
+- Swagger UI OpenAPI contract  
+- Fully documented endpoints  
+- Comments and explanations inside code
 
-Server starts at:
+---
 
-http://localhost:8080/orderflow-api
+# 2. Technology Stack
 
+| Layer | Technology |
+|------|------------|
+| Language | **Java 21** |
+| Framework | **Spring Boot 3.5.x** |
+| Build | **Maven**, Surefire, JaCoCo |
+| Database | **MariaDB 10.6** / H2 |
+| Migrations | **Flyway** |
+| API Docs | **Springdoc OpenAPI 2.6.0 (Swagger UI)** |
+| Server | **Tomcat 10.1 (Jakarta EE)** |
+| CI/CD (planned) | **Jenkins pipelines** |
+| Hosting | **Hostpoint FreeBSD / Nginx reverse proxy** |
 
-⸻
+---
 
-4. Swagger / OpenAPI URLs
+# 3. Architecture Overview
 
-Local
-	•	Swagger UI
-http://localhost:8080/orderflow-api/swagger-ui.html
-	•	Raw OpenAPI JSON
-http://localhost:8080/orderflow-api/v3/api-docs
+OrderFlow uses a **layered architecture**:
 
-Production (Hostpoint)
+```
+orderflow-api
+ ├── domain/        → JPA entities (Order)
+ ├── dto/           → API contract objects
+ ├── mapper/        → Manual mappers (OrderMapper)
+ ├── repository/    → Spring Data repositories
+ ├── service/       → Business logic (OrderServiceImpl)
+ ├── web/           → REST controllers (OrderController)
+ ├── config/        → Global config, CORS, OpenAPI, context-path
+ ├── specs/         → Specifications for dynamic search
+ └── resources/     → Flyway, YAML configs, H2, SQL
+```
 
-Replace domain:
-	•	Swagger UI
-https://devprojects.ch/orderflow-api/swagger-ui.html
-	•	Raw OpenAPI
-https://devprojects.ch/orderflow-api/v3/api-docs
+### Key Design Patterns Used
+- **Mapper Pattern** (OrderMapper)  
+- **Specification Pattern** (OrderSpecifications)  
+- **DTO Pattern**  
+- **Service Layer Pattern**  
+- **Repository Pattern**  
+- (Planned) Strategy, Builder, Template Method, Factory, Assembler
 
-⸻
+---
 
-5. H2 Database
+# 4. Testing Strategy
 
-H2 is persisted on disk.
+This project demonstrates **professional testing discipline**.
 
-Path:
+### ✔ Unit tests (Mockito + JUnit 5)
+- OrderServiceImplTest (full coverage)  
+- OrderMapperTest  
+- OrderSpecificationsTest
 
-~/.orderflow/data.mv.db
+### ✔ Integration tests (H2)
+- Basic persistence tests successful  
+- Flyway migrations validated
 
-URL:
+### Planned
+- Testcontainers for MariaDB  
+- Repository integration tests  
+- REST Controller slice tests  
+- Jenkins CI pipeline running all suites  
+- Code coverage thresholds enforced
 
-jdbc:h2:file:~/.orderflow/data
+JaCoCo reports are published online:  
+**https://devprojects.ch/orderflow-api/jacoco/index.html**
 
-Console:
+---
 
-http://localhost:8080/orderflow-api/h2-console
+# 5. Deployment
 
-
-⸻
-
-6. REST Endpoints
-
-Base:
-
-/orderflow-api/api/orders
-
-Create Order (POST)
-
-{
-  "code": "A-100",
-  "status": "NEW",
-  "total": 15.25
-}
-
-Example statuses:
-
-NEW
-PROCESSING
-COMPLETED
-CANCELLED
-
-Get all
-
-GET /api/orders
-
-Update
-
-PUT /api/orders/{id}
-
-Delete
-
-DELETE /api/orders/{id}
-
-
-⸻
-
-7. Tests
-
-Unit tests
-
-./mvnw test
-
-Integration tests (MockMvc)
-
-OrderControllerIT runs:
-	•	create
-	•	get
-	•	update
-	•	list
-	•	delete
-	•	get-after-delete → 404
-	•	validation → 422
-
+### Local
 Run with:
 
-./mvnw verify
+```bash
+mvn clean test
+mvn spring-boot:run
+```
 
+### Production
+Build WAR:
 
-⸻
+```bash
+mvn clean package -DskipTests
+```
 
-8. Jenkins Pipeline
+Deploy to Tomcat (Hostpoint):
 
-Your Jenkins job now:
-	1.	Checks out code
-	2.	Runs mvn clean verify
-	3.	Publishes test results
-	4.	Publishes JaCoCo report
-	5.	Fails build if tests fail
+```
+/home/zitatusi/app/tools/tomcat/apache-tomcat-10.1.33/webapps/orderflow-api.war
+```
 
-Current build: GREEN
+Tomcat context path is fixed:
 
-⸻
+```yaml
+server:
+  servlet:
+    context-path: /orderflow-api
+```
 
-9. Next Steps
+---
 
-You should check in your changes now:
+# 6. API Endpoints (Summary)
 
-git add .
-git commit -m "Order CRUD stable + Swagger fixed + IT green"
-git push
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/ping` | Health ping |
+| GET | `/api/orders` | List all orders |
+| GET | `/api/orders/{id}` | Get order by ID |
+| GET | `/api/orders/search` | Search by code/status |
+| POST | `/api/orders` | Create order |
+| PUT | `/api/orders/{id}` | Update order |
+| DELETE | `/api/orders/{id}` | Delete order |
 
-After commit/push:
+Full documentation:  
+https://devprojects.ch/orderflow-api/swagger-ui/index.html
 
-Jenkins will run
-Your project remains stable
-Swagger works
-Tests pass
+---
 
-⸻
+# 7. Roadmap (Planned Enhancements)
 
-provide API consumer documentation
-provide Postman collection
-provide Front-end Angular client for Orders
-provide Deployment scripts
+### Phase 1 — API
+- Pagination + sorting  
+- Error handling using RFC 7807 (Problem Details)  
+- Add Customer / Invoice entities  
+- Multi-criteria search with joins
+
+### Phase 2 — Persistence
+- Testcontainers with MariaDB  
+- Repository integration tests  
+- Additional Flyway migrations (V2, V3…)
+
+### Phase 3 — DevOps
+- orderflow-ci (build, test, JaCoCo)  
+- orderflow-deploy-local  
+- orderflow-deploy-prod  
+- orderflow-rollback  
+- orderflow-static-analysis (SpotBugs, PMD, Checkstyle)
+
+### Phase 4 — Cloud Readiness
+- Actuator metrics  
+- OpenTelemetry tracing  
+- Correlation ID (MDC) filters  
+- Structured JSON logging
+
+---
+
+# 8. Purpose of the Project
+
+OrderFlow API is a **professional portfolio backend** demonstrating:
+
+- clean engineering  
+- production-ready Spring Boot expertise  
+- deep testing skills  
+- software architecture understanding  
+- DevOps readiness  
+- cloud deployment  
+- real-world design patterns
+
+It is explicitly built to show recruiters and companies:
+
+> “This is how I structure, test, document, and deploy enterprise-grade backend services.”
+
+---
+
+# 9. Contact
+
+**Giovanni Suter**  
+Email: *giovanni.suter@me.com*  
+GitHub: https://github.com/giosuter  
+Portfolio: https://devprojects.ch  
