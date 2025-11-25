@@ -14,6 +14,9 @@ public class Order {
 
 	@Column(nullable = false, length = 64, unique = true)
 	private String code;
+	
+	@Column(name = "customer_name")
+	private String customerName;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 32)
@@ -31,7 +34,6 @@ public class Order {
 	public Order() {
 	}
 
-	// Getters/Setters
 	public Long getId() {
 		return id;
 	}
@@ -46,6 +48,14 @@ public class Order {
 
 	public void setCode(String code) {
 		this.code = code;
+	}
+	
+	public String getCustomerName() {
+	    return customerName;
+	}
+
+	public void setCustomerName(String customerName) {
+	    this.customerName = customerName;
 	}
 
 	public OrderStatus getStatus() {
