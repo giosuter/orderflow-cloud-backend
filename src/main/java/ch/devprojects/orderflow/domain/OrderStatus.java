@@ -19,6 +19,12 @@ public enum OrderStatus {
 	PROCESSING,
 
 	/**
+	 * Alternative state used by analytics and some frontend views. Represents an
+	 * order that is actively being handled.
+	 */
+	OPEN,
+
+	/**
 	 * Order has been successfully paid by the customer. This state confirms the
 	 * payment has been received and verified.
 	 */
@@ -29,6 +35,12 @@ public enum OrderStatus {
 	 * origin and is in transit.
 	 */
 	SHIPPED,
+
+	/**
+	 * Order has been fully processed and is considered done. Used by analytics and
+	 * reporting.
+	 */
+	COMPLETED,
 
 	/**
 	 * Order has been cancelled either by the customer or by the system. No further

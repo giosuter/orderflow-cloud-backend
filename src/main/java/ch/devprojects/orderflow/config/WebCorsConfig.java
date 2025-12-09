@@ -8,14 +8,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 /**
  * Global CORS configuration for the OrderFlow API.
  *
- * Rules: 
- * - Only paths under /api/** are CORS-enabled.
- * - Allowed origins: 
- *   - http://localhost:4200 (Angular dev server) 
- *   - https://devprojects.ch (Angular app in production) 
- * - Allowed methods: typical REST verbs + OPTIONS.
- * - Allowed headers: all, so Angular can send JSON, auth headers, etc. 
- * - Credentials are disabled for now (stateless API; no cookies).
+ * - Applies to all endpoints under /api/** - Allows ANY Origin (including
+ * "unknown" ones). - Allows standard REST methods and all headers. - Does NOT
+ * use cookies / browser-managed credentials for now.
+ *
+ * When everything is stable in production, you can later tighten this (for
+ * example by restricting allowedOriginPatterns to specific domains).
  */
 @Configuration
 public class WebCorsConfig {
@@ -27,17 +25,17 @@ public class WebCorsConfig {
 			@Override
 			public void addCorsMappings(CorsRegistry registry) {
 				registry.addMapping("/api/**")
-						// Only allow your known frontends
-						.allowedOrigins("http://localhost:4200", "https://devprojects.ch")
-						// Standard REST verbs + preflight
+						// Allow ANY Origin
+						.allowedOriginPatterns("*")
+						// Standard HTTP methods (including preflight)
 						.allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-						// Allow all headers from the frontend
+						// Allow all headers from the client
 						.allowedHeaders("*")
-						// Optionally expose some headers (e.g. Location on POST)
+						// Expose useful headers
 						.exposedHeaders("Location")
-						// No cookies / auth via browser-managed credentials for now
+						// No cookies / browser credentials for now
 						.allowCredentials(false)
-						// Cache preflight response for 1 hour
+						// Cache preflight responses for 1 hour
 						.maxAge(3600);
 			}
 		};
