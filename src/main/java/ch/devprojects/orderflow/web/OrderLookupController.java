@@ -1,50 +1,53 @@
 package ch.devprojects.orderflow.web;
 
+import java.util.Optional;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import ch.devprojects.orderflow.dto.OrderDto;
-import ch.devprojects.orderflow.service.OrderService;
+import ch.devprojects.orderflow.dto.OrderResponseDto;
+import ch.devprojects.orderflow.service.OrderLookupService;
 
 /**
- * OrderLookupController
+ * Lightweight read-only controller for looking up a single Order by its ID.
  *
- * Responsibility:
- * - Expose a dedicated read-only endpoint for looking up an Order by its business code.
+ * IMPORTANT: - Path is intentionally different from OrderController#getOne to
+ * avoid ambiguous mappings.
  *
- * Endpoint:
- * - GET /api/orders/by-code/{code}
+ * Exposed endpoint: - GET /api/order-lookup/{id}
  *
- * Behavior:
- * - Delegates to OrderService.findByCode(code).
- * - On success: returns 200 OK with the OrderDto JSON.
- * - On not found: OrderService throws EntityNotFoundException, which is translated
- *   to 404 by GlobalExceptionHandler.
+ * This allows us to: - Keep the existing canonical endpoint GET
+ * /api/orders/{id} in OrderController - Have a dedicated, clearly separated
+ * lookup controller for experiments, refactorings, and unit tests.
  */
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping("/api/order-lookup") // <- DIFFERENT FROM /api/orders
 public class OrderLookupController {
 
-    private final OrderService orderService;
+	private final OrderLookupService orderLookupService;
 
-    public OrderLookupController(OrderService orderService) {
-        this.orderService = orderService;
-    }
+	/**
+	 * Constructor-based dependency injection. Spring will provide an
+	 * {@link OrderLookupService} bean.
+	 */
+	public OrderLookupController(OrderLookupService orderLookupService) {
+		this.orderLookupService = orderLookupService;
+	}
 
-    /**
-     * Lookup an order by its code (case-insensitive).
-     *
-     * Example:
-     *   GET /api/orders/by-code/ORD-123
-     */
-    @GetMapping("/by-code/{code}")
-    public ResponseEntity<OrderDto> getByCode(@PathVariable("code") String code) {
-        // Delegate to service. If not found, EntityNotFoundException will bubble up
-        // and be handled by GlobalExceptionHandler.
-        OrderDto dto = orderService.findByCode(code);
-        return ResponseEntity.ok(dto);
-    }
+	/**
+	 * Fetch a single order by its ID.
+	 *
+	 * @param id the technical identifier of the order
+	 * @return 200 OK with the OrderResponseDto as JSON if found,<br>
+	 *         404 NOT_FOUND if no order exists with the given ID.
+	 */
+	@GetMapping("/{id}")
+	public ResponseEntity<OrderResponseDto> getOrderById(@PathVariable("id") Long id) {
+		Optional<OrderResponseDto> maybeOrder = orderLookupService.findById(id);
+
+		return maybeOrder.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+	}
 }

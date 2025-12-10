@@ -2,54 +2,54 @@ package ch.devprojects.orderflow.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import ch.devprojects.orderflow.domain.OrderStatus;
 import ch.devprojects.orderflow.dto.OrdersPageResponse;
 
 /**
- * Small unit tests for OrderQueryService.
+ * Unit tests for {@link OrderQueryService}.
  *
- * These tests verify: - basic paging behavior, - that filtering by status and
- * customer works.
- *
- * Later, when we switch to a database-backed implementation, this test will
- * help ensure we do not accidentally change the semantics.
+ * These tests operate on the in-memory sample data to verify that filtering and
+ * pagination work as expected.
  */
 class OrderQueryServiceTest {
 
 	private final OrderQueryService service = new OrderQueryService();
 
 	@Test
-	@DisplayName("findOrders without filters returns first page of data")
-	void findOrders_noFilters_returnsFirstPage() {
-		OrdersPageResponse page = service.findOrders(null, null, 0, 5);
+	@DisplayName("findOrders without filters should return first page of sample data")
+	void findOrders_withoutFilters_returnsFirstPage() {
+		OrdersPageResponse result = service.findOrders(null, null, 0, 20);
 
-		// We expect some content (we added multiple sample orders)
-		assertFalse(page.getContent().isEmpty(), "Content should not be empty for default sample data");
-		assertEquals(0, page.getPage(), "Page index should be 0");
-		assertEquals(5, page.getSize(), "Page size should be 5");
+		assertFalse(result.getContent().isEmpty(), "Content should not be empty");
+		assertEquals(0, result.getPage(), "Page index should be 0");
+		// sample data has 10 entries in current implementation
+		assertEquals(10, result.getTotalElements(), "Total elements should match sample size");
 	}
 
 	@Test
-	@DisplayName("findOrders filters by status (NEW)")
-	void findOrders_filtersByStatus() {
-		OrdersPageResponse page = service.findOrders("NEW", null, 0, 20);
+	@DisplayName("findOrders with status filter NEW should only return NEW orders")
+	void findOrders_withStatusFilter_filtersByStatus() {
+		OrdersPageResponse result = service.findOrders(null, OrderStatus.NEW, 0, 20);
 
-		// All returned orders must have status NEW (case-insensitive)
-		page.getContent().forEach(order -> assertEquals("NEW", order.getStatus(), "All orders should have status NEW"));
+		assertFalse(result.getContent().isEmpty(), "Content should not be empty");
+		assertTrue(result.getContent().stream().allMatch(o -> "NEW".equalsIgnoreCase(o.getStatus())),
+				"All returned orders must have status NEW");
 	}
 
 	@Test
-	@DisplayName("findOrders filters by customer substring")
-	void findOrders_filtersByCustomerSubstring() {
-		OrdersPageResponse page = service.findOrders(null, "acme", 0, 20);
+	@DisplayName("findOrders with customer substring filter should match case-insensitively")
+	void findOrders_withCustomerFilter_filtersByCustomer() {
+		OrdersPageResponse result = service.findOrders("acme", null, 0, 20);
 
-		// All returned orders must contain "acme" (case-insensitive) in customerName
-		page.getContent()
-				.forEach(order -> assertFalse(
-						order.getCustomerName() == null || !order.getCustomerName().toLowerCase().contains("acme"),
-						"Customer name should contain 'acme' (case-insensitive)"));
+		assertFalse(result.getContent().isEmpty(), "Content should not be empty");
+		assertTrue(
+				result.getContent().stream().allMatch(
+						o -> o.getCustomerName() != null && o.getCustomerName().toLowerCase().contains("acme")),
+				"All returned orders must contain 'acme' in the customer name");
 	}
 }

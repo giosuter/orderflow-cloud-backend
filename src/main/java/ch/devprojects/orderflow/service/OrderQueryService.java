@@ -9,6 +9,7 @@ import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 
+import ch.devprojects.orderflow.domain.OrderStatus;
 import ch.devprojects.orderflow.dto.OrderResponseDto;
 import ch.devprojects.orderflow.dto.OrdersPageResponse;
 
@@ -36,15 +37,15 @@ public class OrderQueryService {
 	/**
 	 * Return a filtered and paginated view of orders.
 	 *
-	 * @param status   optional order status filter (case-insensitive, e.g. "NEW")
-	 * @param customer optional customer name substring to search for
-	 *                 (case-insensitive)
-	 * @param page     0-based page index
-	 * @param size     page size (number of elements per page)
+	 * @param customerQuery optional customer name substring to search for
+	 *                      (case-insensitive)
+	 * @param status        optional order status filter (domain enum; may be null)
+	 * @param page          0-based page index
+	 * @param size          page size (number of elements per page)
 	 * @return a page wrapper containing the matching orders slice and paging
 	 *         metadata
 	 */
-	public OrdersPageResponse findOrders(String status, String customer, int page, int size) {
+	public OrdersPageResponse findOrders(String customerQuery, OrderStatus status, int page, int size) {
 		if (size <= 0) {
 			// Defensive default: avoid division by zero and weird values
 			size = 20;
@@ -54,18 +55,22 @@ public class OrderQueryService {
 		}
 
 		// Normalize filters for case-insensitive comparison
-		String normalizedStatus = status != null ? status.trim().toUpperCase(Locale.ROOT) : null;
-		String normalizedCustomer = customer != null ? customer.trim().toLowerCase(Locale.ROOT) : null;
+		String normalizedStatus = (status != null ? status.name() : null);
+		String normalizedCustomer = customerQuery != null ? customerQuery.trim().toLowerCase(Locale.ROOT) : null;
 
 		// 1) Filter in memory (later this logic will move to DB-level)
 		List<OrderResponseDto> filtered = new ArrayList<>();
 		for (OrderResponseDto order : sampleOrders) {
+
+			// Status filter (if provided)
 			if (normalizedStatus != null && !normalizedStatus.isEmpty()) {
-				if (order.getStatus() == null || !order.getStatus().toUpperCase(Locale.ROOT).equals(normalizedStatus)) {
+				String orderStatus = order.getStatus() != null ? order.getStatus().toUpperCase(Locale.ROOT) : "";
+				if (!orderStatus.equals(normalizedStatus)) {
 					continue;
 				}
 			}
 
+			// Customer substring filter (if provided)
 			if (normalizedCustomer != null && !normalizedCustomer.isEmpty()) {
 				String customerName = order.getCustomerName() != null ? order.getCustomerName().toLowerCase(Locale.ROOT)
 						: "";
@@ -141,7 +146,7 @@ public class OrderQueryService {
 		list.add(buildOrder(10L, "ORD-2025-0010", "NEW", "Globex AG", "Giovanni Suter", new BigDecimal("15.75"),
 				LocalDateTime.now().minusHours(1)));
 
-		// You can add a few more if you want to have more pages to test
+		// You can add a few more if you want more pages to test
 
 		return list;
 	}

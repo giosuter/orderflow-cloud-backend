@@ -1,109 +1,92 @@
 package ch.devprojects.orderflow.web;
 
-import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import ch.devprojects.orderflow.domain.OrderStatus;
-import ch.devprojects.orderflow.dto.OrderDto;
-import ch.devprojects.orderflow.service.OrderService;
-import jakarta.persistence.EntityNotFoundException;
+import ch.devprojects.orderflow.dto.OrderResponseDto;
+import ch.devprojects.orderflow.service.OrderLookupService;
 
 /**
- * Web slice tests for {@link OrderLookupController}.
+ * Pure unit test for {@link OrderLookupController}.
  *
- * <p>
- * Focus:
- * </p>
- * <ul>
- * <li>Verify that GET /api/orders/by-code/{code}:</li>
- * <li>delegates to {@link OrderService#findByCode(String)}</li>
- * <li>returns 200 OK with the expected JSON payload when the order exists</li>
- * <li>returns 404 Not Found when the service throws
- * {@link EntityNotFoundException}</li>
- * </ul>
+ * This test: - Instantiates the controller with a mocked
+ * {@link OrderLookupService} - Verifies that the controller correctly
+ * translates service results into HTTP responses (200 OK / 404 NOT_FOUND)
  *
- * <p>
- * The test exercises only the web layer. The {@link OrderService} is replaced
- * by a Mockito-based mock, so we can precisely control the behaviour without
- * touching the database.
- * </p>
+ * No Spring context is started here; we only use the Spring HTTP types for the
+ * ResponseEntity, everything else is a plain JUnit + Mockito test.
  */
-@WebMvcTest(OrderLookupController.class)
+@ExtendWith(MockitoExtension.class)
 class OrderLookupControllerTest {
 
-	/**
-	 * Mockito-based mock of {@link OrderService} for this web slice test.
-	 *
-	 * <p>
-	 * In a {@link WebMvcTest} context, service beans are not created by default.
-	 * {@link MockitoBean} ensures that the controller under test can be constructed
-	 * with a valid {@link OrderService} dependency while still allowing us to
-	 * control its behaviour via Mockito.
-	 * </p>
-	 */
-	@MockitoBean
-	private OrderService orderService;
+	@Mock
+	private OrderLookupService orderLookupService;
 
-	/**
-	 * {@link MockMvc} simulates HTTP requests to the controller without starting a
-	 * real servlet container. This keeps the tests fast while still exercising the
-	 * full Spring MVC stack.
-	 */
-	@Autowired
-	private MockMvc mockMvc;
+	@InjectMocks
+	private OrderLookupController controller;
 
-	// -----------------------------
-	// Happy path
-	// -----------------------------
 	@Test
-	@DisplayName("GET /api/orders/by-code/{code} should return 200 and the Order JSON when the order exists")
-	void getByCode_shouldReturnOrder_whenExists() throws Exception {
+	@DisplayName("getOrderById returns 200 OK and body when order exists")
+	void getOrderById_returnsOkWithBody() {
 		// Arrange
-		String code = "ORD-XYZ";
+		Long orderId = 1L;
 
-		OrderDto dto = new OrderDto();
-		dto.setId(42L);
-		dto.setCode(code);
-		dto.setStatus(OrderStatus.NEW);
-		dto.setTotal(BigDecimal.valueOf(123.45));
+		OrderResponseDto dto = new OrderResponseDto();
+		dto.setId(orderId);
+		dto.setCode("ORD-2025-0001");
+		dto.setStatus("NEW");
+		dto.setCustomerName("Acme GmbH");
+		dto.setAssignedTo("Giovanni Suter");
+		dto.setTotal(new BigDecimal("120.50"));
+		dto.setCreatedAt(LocalDateTime.now().minusDays(1));
 
-		when(orderService.findByCode(eq(code))).thenReturn(dto);
+		when(orderLookupService.findById(orderId)).thenReturn(Optional.of(dto));
 
-		// Act + Assert
-		mockMvc.perform(get("/api/orders/by-code/{code}", code).accept(MediaType.APPLICATION_JSON))
-				.andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-				.andExpect(jsonPath("$.id").value(42)).andExpect(jsonPath("$.code").value("ORD-XYZ"))
-				.andExpect(jsonPath("$.status").value("NEW")).andExpect(jsonPath("$.total").value(123.45));
+		// Act
+		ResponseEntity<OrderResponseDto> response = controller.getOrderById(orderId);
+
+		// Assert
+		assertNotNull(response, "Response must not be null");
+		assertEquals(HttpStatus.OK, response.getStatusCode(), "Status must be 200 OK");
+		assertNotNull(response.getBody(), "Body must not be null");
+		assertEquals(orderId, response.getBody().getId(), "Returned order ID must match requested ID");
+
+		// Verify delegation to the service
+		verify(orderLookupService).findById(orderId);
 	}
 
-	// -----------------------------
-	// Not found path
-	// -----------------------------
 	@Test
-	@DisplayName("GET /api/orders/by-code/{code} should return 404 when the order does not exist")
-	void getByCode_shouldReturn404_whenMissing() throws Exception {
+	@DisplayName("getOrderById returns 404 NOT_FOUND when order does not exist")
+	void getOrderById_returnsNotFoundWhenMissing() {
 		// Arrange
-		String code = "MISSING";
+		Long missingId = 999L;
+		when(orderLookupService.findById(missingId)).thenReturn(Optional.empty());
 
-		when(orderService.findByCode(eq(code))).thenThrow(new EntityNotFoundException("Order not found: " + code));
+		// Act
+		ResponseEntity<OrderResponseDto> response = controller.getOrderById(missingId);
 
-		// Act + Assert
-		mockMvc.perform(get("/api/orders/by-code/{code}", code).accept(MediaType.APPLICATION_JSON))
-				.andExpect(status().isNotFound());
-		// Details of the error body are covered by GlobalExceptionHandler tests.
+		// Assert
+		assertNotNull(response, "Response must not be null");
+		assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode(), "Status must be 404 NOT_FOUND");
+		// For 404 we expect an empty body
+		assertEquals(null, response.getBody(), "Body must be null for NOT_FOUND");
+
+		// Verify delegation to the service
+		verify(orderLookupService).findById(missingId);
 	}
 }

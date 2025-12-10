@@ -1,26 +1,25 @@
 package ch.devprojects.orderflow.web;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import ch.devprojects.orderflow.domain.OrderStatus;
 import ch.devprojects.orderflow.dto.OrdersPageResponse;
 import ch.devprojects.orderflow.service.OrderQueryService;
 
 /**
- * REST controller exposing a read-only Orders search endpoint.
+ * REST controller exposing read-only, filtered order queries.
  *
- * URL example (local, dev profile): GET
- * http://localhost:8080/orderflow-api/api/orders/search?status=NEW&customer=acme&page=0&size=5
+ * Endpoint: GET /api/orders/search
  *
- * URL example (production, Hostpoint): GET
- * https://devprojects.ch/orderflow-api/api/orders/search?status=PAID&customer=globex&page=0&size=10
+ * Query parameters: - customer (optional): substring match on customer name
+ * (case-insensitive) - status (optional): order status, one of NEW, PROCESSING,
+ * PAID, SHIPPED, CANCELLED - page (optional): 0-based page index, default 0 -
+ * size (optional): page size, default 20
  *
- * This controller is intentionally separated from the write-oriented
- * OrderController to highlight a dedicated "query" endpoint suitable for
- * dashboards and Angular data grids.
+ * Example: GET /api/orders/search?customer=acme&status=NEW&page=0&size=10
  */
 @RestController
 @RequestMapping("/api/orders")
@@ -32,27 +31,13 @@ public class OrderQueryController {
 		this.orderQueryService = orderQueryService;
 	}
 
-	/**
-	 * Search orders with optional filters and pagination.
-	 *
-	 * NOTE: Path is "/api/orders/search" to avoid conflicting with the existing GET
-	 * "/api/orders" mapping in OrderController.
-	 *
-	 * @param status   optional status filter (e.g. "NEW", "PROCESSING";
-	 *                 case-insensitive)
-	 * @param customer optional customer name substring (case-insensitive)
-	 * @param page     page index (0-based), defaults to 0
-	 * @param size     page size, defaults to 20
-	 * @return a JSON page wrapper with content + paging metadata
-	 */
 	@GetMapping("/search")
-	public ResponseEntity<OrdersPageResponse> searchOrders(
-			@RequestParam(name = "status", required = false) String status,
-			@RequestParam(name = "customer", required = false) String customer,
+	public OrdersPageResponse searchOrders(@RequestParam(name = "customer", required = false) String customer,
+			@RequestParam(name = "status", required = false) OrderStatus status,
 			@RequestParam(name = "page", defaultValue = "0") int page,
 			@RequestParam(name = "size", defaultValue = "20") int size) {
 
-		OrdersPageResponse result = orderQueryService.findOrders(status, customer, page, size);
-		return ResponseEntity.ok(result);
+		// NOTE: call signature matches the service: (customerQuery, status, page, size)
+		return orderQueryService.findOrders(customer, status, page, size);
 	}
 }
