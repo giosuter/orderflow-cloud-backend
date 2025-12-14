@@ -43,7 +43,7 @@ class OrderQueryControllerTest {
 	private OrderQueryService orderQueryService;
 
 	@Test
-	@DisplayName("GET /api/orders/search forwards paging + sorting and returns OrdersPageResponse")
+	@DisplayName("GET /api/orders/search forwards paging + sorting + totalMin/totalMax and returns OrdersPageResponse")
 	void search_shouldForwardParamsAndReturnResponse() throws Exception {
 		// Arrange
 		OrderResponseDto dto = new OrderResponseDto();
@@ -63,13 +63,17 @@ class OrderQueryControllerTest {
 		response.setFirst(true);
 		response.setLast(true);
 
-		when(orderQueryService.findOrders(eq("alice"), eq(OrderStatus.NEW), eq(0), eq(20), eq("code"), eq("asc")))
-				.thenReturn(response);
+		BigDecimal totalMin = new BigDecimal("100.00");
+		BigDecimal totalMax = new BigDecimal("200.00");
+
+		when(orderQueryService.findOrders(eq("alice"), eq(OrderStatus.NEW), eq(0), eq(20), eq("code"), eq("asc"),
+				eq(totalMin), eq(totalMax))).thenReturn(response);
 
 		// Act + Assert
 		mockMvc.perform(get("/api/orders/search").param("customer", "alice").param("status", "NEW").param("page", "0")
-				.param("size", "20").param("sortBy", "code").param("sortDir", "asc").accept(MediaType.APPLICATION_JSON))
-				.andExpect(status().isOk()).andExpect(jsonPath("$.content[0].id").value(1))
+				.param("size", "20").param("sortBy", "code").param("sortDir", "asc").param("totalMin", "100.00")
+				.param("totalMax", "200.00").accept(MediaType.APPLICATION_JSON)).andExpect(status().isOk())
+				.andExpect(jsonPath("$.content[0].id").value(1))
 				.andExpect(jsonPath("$.content[0].code").value("ORD-001"))
 				.andExpect(jsonPath("$.content[0].status").value("NEW")).andExpect(jsonPath("$.page").value(0))
 				.andExpect(jsonPath("$.size").value(20)).andExpect(jsonPath("$.totalElements").value(1))
@@ -77,6 +81,6 @@ class OrderQueryControllerTest {
 				.andExpect(jsonPath("$.last").value(true));
 
 		// Verify forwarding
-		verify(orderQueryService).findOrders("alice", OrderStatus.NEW, 0, 20, "code", "asc");
+		verify(orderQueryService).findOrders("alice", OrderStatus.NEW, 0, 20, "code", "asc", totalMin, totalMax);
 	}
 }

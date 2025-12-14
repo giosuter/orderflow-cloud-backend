@@ -32,8 +32,8 @@ import org.springframework.data.jpa.domain.Specification;
 /**
  * Unit tests for {@link OrderQueryService}.
  *
- * Focus: - Pageable + Sort creation - Specification composition (basic) -
- * Mapping into OrdersPageResponse DTO
+ * Focus: - Pageable + Sort creation - Mapping into OrdersPageResponse DTO -
+ * Signature coverage for optional filters (including totalMin/totalMax)
  */
 @ExtendWith(MockitoExtension.class)
 class OrderQueryServiceTest {
@@ -45,16 +45,17 @@ class OrderQueryServiceTest {
 	private OrderQueryService orderQueryService;
 
 	@Test
-	@DisplayName("findOrders should apply sortBy=code sortDir=asc into Pageable")
-	void findOrders_shouldApplySorting() {
+	@DisplayName("findOrders should apply sortBy=code sortDir=asc into Pageable and map DTOs")
+	void findOrders_shouldApplySortingAndMapDtos() {
 		// Arrange
-		Order order = createOrder(1L, "ORD-001", OrderStatus.NEW);
+		Order order = createOrder(1L, "ORD-001", OrderStatus.NEW, BigDecimal.valueOf(150.00));
 		Page<Order> page = new PageImpl<>(List.of(order));
 
 		when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
 		// Act
-		OrdersPageResponse response = orderQueryService.findOrders("alice", OrderStatus.NEW, 0, 20, "code", "asc");
+		OrdersPageResponse response = orderQueryService.findOrders("alice", OrderStatus.NEW, 0, 20, "code", "asc",
+				new BigDecimal("100.00"), new BigDecimal("200.00"));
 
 		// Assert mapping basics
 		assertThat(response.getContent()).hasSize(1);
@@ -73,19 +74,18 @@ class OrderQueryServiceTest {
 	}
 
 	@Test
-	@DisplayName("findOrders should fallback to createdAt desc when sortBy is invalid")
+	@DisplayName("findOrders should fallback to createdAt when sortBy is invalid")
 	void findOrders_shouldFallbackWhenSortByInvalid() {
 		// Arrange
-		Order order = createOrder(1L, "ORD-001", OrderStatus.NEW);
+		Order order = createOrder(1L, "ORD-001", OrderStatus.NEW, BigDecimal.valueOf(150.00));
 		Page<Order> page = new PageImpl<>(List.of(order));
 
 		when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
 		// Act
-		orderQueryService.findOrders(null, null, 0, 20, "DROP_TABLES", "asc");
+		orderQueryService.findOrders(null, null, 0, 20, "DROP_TABLES", "asc", null, null);
 
-		// Assert: sort should be by createdAt (desc unless sortDir=asc and allowed, but
-		// fallback keeps field)
+		// Assert: sort should be by createdAt (field fallback)
 		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
 		verify(orderRepository).findAll(any(Specification.class), pageableCaptor.capture());
 
@@ -93,13 +93,13 @@ class OrderQueryServiceTest {
 		assertThat(used.getSort().getOrderFor("createdAt")).isNotNull();
 	}
 
-	private Order createOrder(Long id, String code, OrderStatus status) {
+	private Order createOrder(Long id, String code, OrderStatus status, BigDecimal total) {
 		Order order = new Order();
 		order.setId(id);
 		order.setCode(code);
 		order.setStatus(status);
 		order.setCustomerName("Alice");
-		order.setTotal(BigDecimal.valueOf(99.90));
+		order.setTotal(total);
 		order.setCreatedAt(Instant.now());
 		return order;
 	}

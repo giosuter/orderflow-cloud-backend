@@ -1,5 +1,6 @@
 package ch.devprojects.orderflow.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -65,16 +66,17 @@ public class OrderQueryService {
 
 	/**
 	 * Search endpoint used by Angular: GET
-	 * /api/orders/search?customer=&status=&page=&size=&sortBy=&sortDir=
+	 * /api/orders/search?customer=&status=&page=&size=&sortBy=&sortDir=&totalMin=&totalMax=
 	 *
 	 * Filters: - customer: contains match against code OR customerName (ignore
-	 * case) - status: exact match on enum
+	 * case) - status: exact match on enum - totalMin/totalMax: inclusive bounds for
+	 * Order.total
 	 *
 	 * Sorting: - sortBy must be in ALLOWED_SORT_FIELDS; otherwise defaults to
 	 * createdAt - sortDir is asc/desc; otherwise defaults to desc
 	 */
 	public OrdersPageResponse findOrders(String customer, OrderStatus status, int page, int size, String sortBy,
-			String sortDir) {
+			String sortDir, BigDecimal totalMin, BigDecimal totalMax) {
 
 		Sort sort = buildSort(sortBy, sortDir);
 
@@ -88,6 +90,14 @@ public class OrderQueryService {
 
 		if (status != null) {
 			spec = spec.and(hasStatus(status));
+		}
+
+		if (totalMin != null) {
+			spec = spec.and(totalGreaterOrEqual(totalMin));
+		}
+
+		if (totalMax != null) {
+			spec = spec.and(totalLessOrEqual(totalMax));
 		}
 
 		Page<Order> resultPage = orderRepository.findAll(spec, pageable);
@@ -106,8 +116,8 @@ public class OrderQueryService {
 	/**
 	 * Converts Order entity to OrderResponseDto.
 	 *
-	 * Type conversions (important): - status: OrderStatus enum -> String -
-	 * createdAt: Instant -> LocalDateTime (UTC)
+	 * Type conversions: - status: OrderStatus enum -> String - createdAt: Instant
+	 * -> LocalDateTime (UTC)
 	 */
 	private OrderResponseDto toOrderResponseDto(Order order) {
 		OrderResponseDto dto = new OrderResponseDto();
@@ -144,6 +154,14 @@ public class OrderQueryService {
 
 	private Specification<Order> hasStatus(OrderStatus status) {
 		return (root, query, cb) -> cb.equal(root.get("status"), status);
+	}
+
+	private Specification<Order> totalGreaterOrEqual(BigDecimal totalMin) {
+		return (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("total"), totalMin);
+	}
+
+	private Specification<Order> totalLessOrEqual(BigDecimal totalMax) {
+		return (root, query, cb) -> cb.lessThanOrEqualTo(root.get("total"), totalMax);
 	}
 
 	// ---------------------------------------------------------------------
