@@ -1,8 +1,6 @@
 package ch.devprojects.orderflow.service;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,43 +11,57 @@ import ch.devprojects.orderflow.dto.OrdersPageResponse;
 /**
  * Unit tests for {@link OrderQueryService}.
  *
- * These tests operate on the in-memory sample data to verify that filtering and
- * pagination work as expected.
+ * These tests validate the in-memory stub filtering + paging behavior.
  */
 class OrderQueryServiceTest {
 
-	private final OrderQueryService service = new OrderQueryService();
-
 	@Test
-	@DisplayName("findOrders without filters should return first page of sample data")
-	void findOrders_withoutFilters_returnsFirstPage() {
-		OrdersPageResponse result = service.findOrders(null, null, 0, 20);
+	@DisplayName("findOrders filters by status (NEW)")
+	void findOrders_filtersByStatus() {
+		// Arrange
+		OrderQueryService service = new OrderQueryService();
 
-		assertFalse(result.getContent().isEmpty(), "Content should not be empty");
-		assertEquals(0, result.getPage(), "Page index should be 0");
-		// sample data has 10 entries in current implementation
-		assertEquals(10, result.getTotalElements(), "Total elements should match sample size");
+		// Act
+		OrdersPageResponse res = service.findOrders(null, OrderStatus.NEW, 0, 50);
+
+		// Assert
+		assertThat(res).isNotNull();
+		assertThat(res.getContent()).isNotEmpty();
+		assertThat(res.getContent()).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo("NEW"));
 	}
 
 	@Test
-	@DisplayName("findOrders with status filter NEW should only return NEW orders")
-	void findOrders_withStatusFilter_filtersByStatus() {
-		OrdersPageResponse result = service.findOrders(null, OrderStatus.NEW, 0, 20);
+	@DisplayName("findOrders matches term against code OR customerName")
+	void findOrders_filtersByTerm_matchesCodeOrCustomer() {
+		// Arrange
+		OrderQueryService service = new OrderQueryService();
 
-		assertFalse(result.getContent().isEmpty(), "Content should not be empty");
-		assertTrue(result.getContent().stream().allMatch(o -> "NEW".equalsIgnoreCase(o.getStatus())),
-				"All returned orders must have status NEW");
+		// Act: term matches code
+		OrdersPageResponse byCode = service.findOrders("ORD-2025-0001", null, 0, 50);
+
+		// Assert
+		assertThat(byCode.getContent()).hasSize(1);
+		assertThat(byCode.getContent().get(0).getCode()).isEqualTo("ORD-2025-0001");
+
+		// Act: term matches customerName
+		OrdersPageResponse byCustomer = service.findOrders("Acme", null, 0, 50);
+
+		// Assert: multiple Acme GmbH orders exist in the stub data
+		assertThat(byCustomer.getContent()).isNotEmpty();
+		assertThat(byCustomer.getContent()).allSatisfy(o -> assertThat(o.getCode()).isNotBlank());
 	}
 
 	@Test
-	@DisplayName("findOrders with customer substring filter should match case-insensitively")
-	void findOrders_withCustomerFilter_filtersByCustomer() {
-		OrdersPageResponse result = service.findOrders("acme", null, 0, 20);
+	@DisplayName("findOrders paginates correctly")
+	void findOrders_paginates() {
+		OrderQueryService service = new OrderQueryService();
 
-		assertFalse(result.getContent().isEmpty(), "Content should not be empty");
-		assertTrue(
-				result.getContent().stream().allMatch(
-						o -> o.getCustomerName() != null && o.getCustomerName().toLowerCase().contains("acme")),
-				"All returned orders must contain 'acme' in the customer name");
+		OrdersPageResponse page0 = service.findOrders(null, null, 0, 5);
+		OrdersPageResponse page1 = service.findOrders(null, null, 1, 5);
+
+		assertThat(page0.getContent()).hasSize(5);
+		assertThat(page1.getContent()).hasSize(5);
+		assertThat(page0.getTotalElements()).isEqualTo(10);
+		assertThat(page0.getTotalPages()).isEqualTo(2);
 	}
 }

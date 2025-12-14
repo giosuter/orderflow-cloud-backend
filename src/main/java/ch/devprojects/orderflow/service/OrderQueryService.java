@@ -16,14 +16,11 @@ import ch.devprojects.orderflow.dto.OrdersPageResponse;
 /**
  * Read-only query service for Orders.
  *
- * For the first step, this service uses an in-memory list of stub data. This
- * allows us to: - design and stabilize the API contract, - implement the
- * Angular Orders List screen, - demonstrate filtering and pagination, before we
- * hook this into the real database.
+ * Current implementation uses an in-memory list of stub data to stabilize: -
+ * the API contract - filtering behavior - pagination behavior
  *
- * Later we can replace the internal implementation with: - a JPA repository
- * query, - or a dedicated query component, without changing the public method
- * signature.
+ * Later, we can replace the internals with a JPA query without changing the
+ * method signature.
  */
 @Service
 public class OrderQueryService {
@@ -37,44 +34,51 @@ public class OrderQueryService {
 	/**
 	 * Return a filtered and paginated view of orders.
 	 *
-	 * @param customerQuery optional customer name substring to search for
-	 *                      (case-insensitive)
-	 * @param status        optional order status filter (domain enum; may be null)
-	 * @param page          0-based page index
-	 * @param size          page size (number of elements per page)
-	 * @return a page wrapper containing the matching orders slice and paging
-	 *         metadata
+	 * Contract: - "customer" is a free-text term that matches BOTH: - order code
+	 * (e.g. ORD-2025-0001) - customerName (e.g. Acme GmbH) - "status" is an
+	 * optional enum filter
+	 *
+	 * @param customerTerm optional search term (matches code OR customerName)
+	 * @param status       optional status filter
+	 * @param page         0-based page index
+	 * @param size         page size
+	 * @return OrdersPageResponse containing page content + metadata
 	 */
-	public OrdersPageResponse findOrders(String customerQuery, OrderStatus status, int page, int size) {
+	public OrdersPageResponse findOrders(String customerTerm, OrderStatus status, int page, int size) {
+
+		// Defensive defaults
 		if (size <= 0) {
-			// Defensive default: avoid division by zero and weird values
 			size = 20;
 		}
 		if (page < 0) {
 			page = 0;
 		}
 
-		// Normalize filters for case-insensitive comparison
-		String normalizedStatus = (status != null ? status.name() : null);
-		String normalizedCustomer = customerQuery != null ? customerQuery.trim().toLowerCase(Locale.ROOT) : null;
+		final String normalizedTerm = (customerTerm != null && !customerTerm.trim().isEmpty())
+				? customerTerm.trim().toLowerCase(Locale.ROOT)
+				: null;
 
-		// 1) Filter in memory (later this logic will move to DB-level)
+		final String normalizedStatus = (status != null) ? status.name() : null;
+
+		// 1) Filter in memory (later move to DB-level)
 		List<OrderResponseDto> filtered = new ArrayList<>();
 		for (OrderResponseDto order : sampleOrders) {
 
-			// Status filter (if provided)
-			if (normalizedStatus != null && !normalizedStatus.isEmpty()) {
-				String orderStatus = order.getStatus() != null ? order.getStatus().toUpperCase(Locale.ROOT) : "";
-				if (!orderStatus.equals(normalizedStatus)) {
+			// Status filter
+			if (normalizedStatus != null) {
+				String orderStatus = order.getStatus();
+				if (orderStatus == null || !orderStatus.equalsIgnoreCase(normalizedStatus)) {
 					continue;
 				}
 			}
 
-			// Customer substring filter (if provided)
-			if (normalizedCustomer != null && !normalizedCustomer.isEmpty()) {
+			// Term filter (code OR customerName)
+			if (normalizedTerm != null) {
+				String code = order.getCode() != null ? order.getCode().toLowerCase(Locale.ROOT) : "";
 				String customerName = order.getCustomerName() != null ? order.getCustomerName().toLowerCase(Locale.ROOT)
 						: "";
-				if (!customerName.contains(normalizedCustomer)) {
+
+				if (!code.contains(normalizedTerm) && !customerName.contains(normalizedTerm)) {
 					continue;
 				}
 			}
@@ -83,10 +87,11 @@ public class OrderQueryService {
 		}
 
 		long totalElements = filtered.size();
-		int totalPages = (int) ((totalElements + size - 1) / size); // ceiling division
+		int totalPages = (int) ((totalElements + size - 1) / size);
 
 		// 2) Compute page slice
 		int fromIndex = page * size;
+
 		List<OrderResponseDto> pageContent;
 		if (fromIndex >= filtered.size()) {
 			pageContent = Collections.emptyList();
@@ -106,13 +111,6 @@ public class OrderQueryService {
 		return response;
 	}
 
-	/**
-	 * Build a small, but realistic, set of sample orders with: - different statuses
-	 * - different customers - different assignees - different totals and timestamps
-	 *
-	 * This is purely for the first development phase. Later we will replace this
-	 * with real data from the database.
-	 */
 	private List<OrderResponseDto> buildSampleOrders() {
 		List<OrderResponseDto> list = new ArrayList<>();
 
@@ -145,8 +143,6 @@ public class OrderQueryService {
 
 		list.add(buildOrder(10L, "ORD-2025-0010", "NEW", "Globex AG", "Giovanni Suter", new BigDecimal("15.75"),
 				LocalDateTime.now().minusHours(1)));
-
-		// You can add a few more if you want more pages to test
 
 		return list;
 	}
