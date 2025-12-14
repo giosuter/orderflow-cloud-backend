@@ -4,34 +4,29 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * DTO used to expose Order data via the REST API.
+ * DTO returned to the frontend for order list / search results.
  *
- * For now this is independent from any JPA entity. Later we can map from the
- * real Order entity to this DTO without breaking the API contract or the
- * Angular frontend.
+ * Design choices (matching current tests + typical Angular expectations): -
+ * status is a String (e.g. "NEW") rather than an enum - createdAt is
+ * LocalDateTime (simple JSON representation)
+ *
+ * This avoids leaking JPA entities to the frontend.
  */
 public class OrderResponseDto {
 
-	// Unique identifier of the order
 	private Long id;
-
-	// Human-readable order code, e.g. "ORD-2025-0001"
 	private String code;
-
-	// Current lifecycle status, e.g. NEW, PROCESSING, PAID, SHIPPED, CANCELLED
 	private String status;
 
-	// Business actor: the customer that placed the order
 	private String customerName;
-
-	// System actor: person responsible for this order (can be null)
 	private String assignedTo;
 
-	// Monetary total of the order
 	private BigDecimal total;
+	private LocalDateTime createdAt;
 
-	// When the order was created; later this can be taken from the DB
-	private LocalDateTime createdAt;	
+	public OrderResponseDto() {
+		// default constructor for JSON serialization
+	}
 
 	public Long getId() {
 		return id;

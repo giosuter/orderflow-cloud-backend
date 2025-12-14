@@ -1,163 +1,144 @@
 package ch.devprojects.orderflow.service;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Locale;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import ch.devprojects.orderflow.domain.Order;
 import ch.devprojects.orderflow.domain.OrderStatus;
 import ch.devprojects.orderflow.dto.OrderResponseDto;
 import ch.devprojects.orderflow.dto.OrdersPageResponse;
+import ch.devprojects.orderflow.repository.OrderRepository;
 
 /**
  * Read-only query service for Orders.
  *
- * Current implementation uses an in-memory list of stub data to stabilize: -
- * the API contract - filtering behavior - pagination behavior
- *
- * Later, we can replace the internals with a JPA query without changing the
- * method signature.
+ * Controller contract: - OrderQueryController expects OrdersPageResponse
+ * (DTO-based). - This service builds specifications, executes paged queries,
+ * and maps entities to DTOs.
  */
 @Service
+@Transactional(readOnly = true)
 public class OrderQueryService {
 
-	private final List<OrderResponseDto> sampleOrders;
+	private final OrderRepository orderRepository;
 
-	public OrderQueryService() {
-		this.sampleOrders = buildSampleOrders();
+	public OrderQueryService(OrderRepository orderRepository) {
+		this.orderRepository = orderRepository;
+	}
+
+	public List<Order> findAll() {
+		return orderRepository.findAll();
+	}
+
+	public Optional<Order> findById(long id) {
+		return orderRepository.findById(id);
+	}
+
+	public List<Order> findByStatus(OrderStatus status) {
+		return orderRepository.findByStatus(status);
 	}
 
 	/**
-	 * Return a filtered and paginated view of orders.
+	 * Search endpoint used by Angular: GET
+	 * /api/orders/search?customer=&status=&page=&size=
 	 *
-	 * Contract: - "customer" is a free-text term that matches BOTH: - order code
-	 * (e.g. ORD-2025-0001) - customerName (e.g. Acme GmbH) - "status" is an
-	 * optional enum filter
-	 *
-	 * @param customerTerm optional search term (matches code OR customerName)
-	 * @param status       optional status filter
-	 * @param page         0-based page index
-	 * @param size         page size
-	 * @return OrdersPageResponse containing page content + metadata
+	 * "customer" currently matches code OR customerName (contains, ignore case).
 	 */
-	public OrdersPageResponse findOrders(String customerTerm, OrderStatus status, int page, int size) {
+	public OrdersPageResponse findOrders(String customer, OrderStatus status, int page, int size) {
 
-		// Defensive defaults
-		if (size <= 0) {
-			size = 20;
-		}
-		if (page < 0) {
-			page = 0;
-		}
+		Pageable pageable = PageRequest.of(Math.max(0, page), normalizeSize(size), defaultSort());
 
-		final String normalizedTerm = (customerTerm != null && !customerTerm.trim().isEmpty())
-				? customerTerm.trim().toLowerCase(Locale.ROOT)
-				: null;
+		Specification<Order> spec = Specification.where(null);
 
-		final String normalizedStatus = (status != null) ? status.name() : null;
-
-		// 1) Filter in memory (later move to DB-level)
-		List<OrderResponseDto> filtered = new ArrayList<>();
-		for (OrderResponseDto order : sampleOrders) {
-
-			// Status filter
-			if (normalizedStatus != null) {
-				String orderStatus = order.getStatus();
-				if (orderStatus == null || !orderStatus.equalsIgnoreCase(normalizedStatus)) {
-					continue;
-				}
-			}
-
-			// Term filter (code OR customerName)
-			if (normalizedTerm != null) {
-				String code = order.getCode() != null ? order.getCode().toLowerCase(Locale.ROOT) : "";
-				String customerName = order.getCustomerName() != null ? order.getCustomerName().toLowerCase(Locale.ROOT)
-						: "";
-
-				if (!code.contains(normalizedTerm) && !customerName.contains(normalizedTerm)) {
-					continue;
-				}
-			}
-
-			filtered.add(order);
+		if (customer != null && !customer.trim().isEmpty()) {
+			spec = spec.and(matchesCustomerTerm(customer.trim()));
 		}
 
-		long totalElements = filtered.size();
-		int totalPages = (int) ((totalElements + size - 1) / size);
-
-		// 2) Compute page slice
-		int fromIndex = page * size;
-
-		List<OrderResponseDto> pageContent;
-		if (fromIndex >= filtered.size()) {
-			pageContent = Collections.emptyList();
-		} else {
-			int toIndex = Math.min(fromIndex + size, filtered.size());
-			pageContent = filtered.subList(fromIndex, toIndex);
+		if (status != null) {
+			spec = spec.and(hasStatus(status));
 		}
 
-		// 3) Build response
-		OrdersPageResponse response = new OrdersPageResponse();
-		response.setContent(pageContent);
-		response.setPage(page);
-		response.setSize(size);
-		response.setTotalElements(totalElements);
-		response.setTotalPages(totalPages);
+		Page<Order> resultPage = orderRepository.findAll(spec, pageable);
 
-		return response;
+		List<OrderResponseDto> dtos = resultPage.getContent().stream().map(this::toOrderResponseDto)
+				.collect(Collectors.toList());
+
+		return new OrdersPageResponse(dtos, resultPage.getNumber(), resultPage.getSize(), resultPage.getTotalElements(),
+				resultPage.getTotalPages(), resultPage.isFirst(), resultPage.isLast());
 	}
 
-	private List<OrderResponseDto> buildSampleOrders() {
-		List<OrderResponseDto> list = new ArrayList<>();
+	// ---------------------------------------------------------------------
+	// Mapping
+	// ---------------------------------------------------------------------
 
-		list.add(buildOrder(1L, "ORD-2025-0001", "NEW", "Acme GmbH", "Giovanni Suter", new BigDecimal("120.50"),
-				LocalDateTime.now().minusDays(2)));
-
-		list.add(buildOrder(2L, "ORD-2025-0002", "PROCESSING", "Globex AG", "Anna Keller", new BigDecimal("89.90"),
-				LocalDateTime.now().minusDays(1)));
-
-		list.add(buildOrder(3L, "ORD-2025-0003", "PAID", "Innotech Solutions", "Mark Weber", new BigDecimal("240.00"),
-				LocalDateTime.now().minusHours(12)));
-
-		list.add(buildOrder(4L, "ORD-2025-0004", "SHIPPED", "Acme GmbH", "Logistics Team", new BigDecimal("560.75"),
-				LocalDateTime.now().minusHours(6)));
-
-		list.add(buildOrder(5L, "ORD-2025-0005", "CANCELLED", "Sunrise Retail", "Giovanni Suter",
-				new BigDecimal("45.00"), LocalDateTime.now().minusDays(5)));
-
-		list.add(buildOrder(6L, "ORD-2025-0006", "NEW", "Techify AG", "Anna Keller", new BigDecimal("310.25"),
-				LocalDateTime.now().minusDays(3)));
-
-		list.add(buildOrder(7L, "ORD-2025-0007", "PROCESSING", "BlueOcean GmbH", "Support Team",
-				new BigDecimal("199.99"), LocalDateTime.now().minusDays(4)));
-
-		list.add(buildOrder(8L, "ORD-2025-0008", "PAID", "Acme GmbH", "Mark Weber", new BigDecimal("870.00"),
-				LocalDateTime.now().minusDays(7)));
-
-		list.add(buildOrder(9L, "ORD-2025-0009", "SHIPPED", "FutureLab AG", "Logistics Team", new BigDecimal("42.10"),
-				LocalDateTime.now().minusHours(2)));
-
-		list.add(buildOrder(10L, "ORD-2025-0010", "NEW", "Globex AG", "Giovanni Suter", new BigDecimal("15.75"),
-				LocalDateTime.now().minusHours(1)));
-
-		return list;
-	}
-
-	private OrderResponseDto buildOrder(Long id, String code, String status, String customerName, String assignedTo,
-			BigDecimal total, LocalDateTime createdAt) {
-
+	/**
+	 * Maps Order entity -> OrderResponseDto.
+	 *
+	 * Adjust the field mapping here if your OrderResponseDto uses different
+	 * property names.
+	 */
+	private OrderResponseDto toOrderResponseDto(Order order) {
 		OrderResponseDto dto = new OrderResponseDto();
-		dto.setId(id);
-		dto.setCode(code);
-		dto.setStatus(status);
-		dto.setCustomerName(customerName);
-		dto.setAssignedTo(assignedTo);
-		dto.setTotal(total);
-		dto.setCreatedAt(createdAt);
+
+		dto.setId(order.getId());
+		dto.setCode(order.getCode());
+
+		// OrderStatus (enum) -> String
+		if (order.getStatus() != null) {
+			dto.setStatus(order.getStatus().name());
+		}
+
+		dto.setCustomerName(order.getCustomerName());
+		dto.setTotal(order.getTotal());
+
+		// Instant -> LocalDateTime (UTC)
+		if (order.getCreatedAt() != null) {
+			dto.setCreatedAt(LocalDateTime.ofInstant(order.getCreatedAt(), ZoneOffset.UTC));
+		}
+
 		return dto;
+	}
+
+	// ---------------------------------------------------------------------
+	// Specifications
+	// ---------------------------------------------------------------------
+
+	private Specification<Order> matchesCustomerTerm(String term) {
+		return (root, query, cb) -> {
+			String like = "%" + term.toLowerCase() + "%";
+			return cb.or(cb.like(cb.lower(root.get("code")), like), cb.like(cb.lower(root.get("customerName")), like));
+		};
+	}
+
+	private Specification<Order> hasStatus(OrderStatus status) {
+		return (root, query, cb) -> cb.equal(root.get("status"), status);
+	}
+
+	// ---------------------------------------------------------------------
+	// Helpers
+	// ---------------------------------------------------------------------
+
+	private int normalizeSize(int size) {
+		if (size <= 0) {
+			return 20;
+		}
+		return Math.min(size, 200);
+	}
+
+	private Sort defaultSort() {
+		// If your entity does not have "createdAt", change to
+		// Sort.by("id").descending()
+		return Sort.by(Sort.Direction.DESC, "createdAt");
 	}
 }

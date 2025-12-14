@@ -1,67 +1,129 @@
 package ch.devprojects.orderflow.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+import ch.devprojects.orderflow.domain.Order;
 import ch.devprojects.orderflow.domain.OrderStatus;
-import ch.devprojects.orderflow.dto.OrdersPageResponse;
+import ch.devprojects.orderflow.repository.OrderRepository;
 
 /**
  * Unit tests for {@link OrderQueryService}.
  *
- * These tests validate the in-memory stub filtering + paging behavior.
+ * Purpose: - Verify read-only query logic - Ensure correct delegation to
+ * {@link OrderRepository} - Protect against accidental business logic leakage
+ *
+ * Style: - Pure unit test - No Spring context - Mockito-based isolation
  */
+@ExtendWith(MockitoExtension.class)
 class OrderQueryServiceTest {
 
+	@Mock
+	private OrderRepository orderRepository;
+
+	@InjectMocks
+	private OrderQueryService orderQueryService;
+
+	// ---------------------------------------------------------------------
+	// findAll()
+	// ---------------------------------------------------------------------
+
 	@Test
-	@DisplayName("findOrders filters by status (NEW)")
-	void findOrders_filtersByStatus() {
+	@DisplayName("findAll should return all orders from repository")
+	void findAll_shouldReturnAllOrders() {
 		// Arrange
-		OrderQueryService service = new OrderQueryService();
+		Order order1 = createOrder(1L, "ORD-001", OrderStatus.NEW);
+		Order order2 = createOrder(2L, "ORD-002", OrderStatus.PROCESSING);
+
+		when(orderRepository.findAll()).thenReturn(List.of(order1, order2));
 
 		// Act
-		OrdersPageResponse res = service.findOrders(null, OrderStatus.NEW, 0, 50);
+		List<Order> result = orderQueryService.findAll();
 
 		// Assert
-		assertThat(res).isNotNull();
-		assertThat(res.getContent()).isNotEmpty();
-		assertThat(res.getContent()).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo("NEW"));
+		assertThat(result).hasSize(2).containsExactly(order1, order2);
 	}
 
+	// ---------------------------------------------------------------------
+	// findById()
+	// ---------------------------------------------------------------------
+
 	@Test
-	@DisplayName("findOrders matches term against code OR customerName")
-	void findOrders_filtersByTerm_matchesCodeOrCustomer() {
+	@DisplayName("findById should return order when found")
+	void findById_shouldReturnOrder_whenFound() {
 		// Arrange
-		OrderQueryService service = new OrderQueryService();
+		Order order = createOrder(10L, "ORD-010", OrderStatus.PAID);
 
-		// Act: term matches code
-		OrdersPageResponse byCode = service.findOrders("ORD-2025-0001", null, 0, 50);
+		when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+
+		// Act
+		Optional<Order> result = orderQueryService.findById(10L);
 
 		// Assert
-		assertThat(byCode.getContent()).hasSize(1);
-		assertThat(byCode.getContent().get(0).getCode()).isEqualTo("ORD-2025-0001");
-
-		// Act: term matches customerName
-		OrdersPageResponse byCustomer = service.findOrders("Acme", null, 0, 50);
-
-		// Assert: multiple Acme GmbH orders exist in the stub data
-		assertThat(byCustomer.getContent()).isNotEmpty();
-		assertThat(byCustomer.getContent()).allSatisfy(o -> assertThat(o.getCode()).isNotBlank());
+		assertThat(result).isPresent();
+		assertThat(result.get().getCode()).isEqualTo("ORD-010");
 	}
 
 	@Test
-	@DisplayName("findOrders paginates correctly")
-	void findOrders_paginates() {
-		OrderQueryService service = new OrderQueryService();
+	@DisplayName("findById should return empty when order not found")
+	void findById_shouldReturnEmpty_whenNotFound() {
+		// Arrange
+		when(orderRepository.findById(99L)).thenReturn(Optional.empty());
 
-		OrdersPageResponse page0 = service.findOrders(null, null, 0, 5);
-		OrdersPageResponse page1 = service.findOrders(null, null, 1, 5);
+		// Act
+		Optional<Order> result = orderQueryService.findById(99L);
 
-		assertThat(page0.getContent()).hasSize(5);
-		assertThat(page1.getContent()).hasSize(5);
-		assertThat(page0.getTotalElements()).isEqualTo(10);
-		assertThat(page0.getTotalPages()).isEqualTo(2);
+		// Assert
+		assertThat(result).isEmpty();
+	}
+
+	// ---------------------------------------------------------------------
+	// findByStatus()
+	// ---------------------------------------------------------------------
+
+	@Test
+	@DisplayName("findByStatus should return orders with given status")
+	void findByStatus_shouldReturnMatchingOrders() {
+		// Arrange
+		Order order1 = createOrder(1L, "ORD-100", OrderStatus.SHIPPED);
+		Order order2 = createOrder(2L, "ORD-101", OrderStatus.SHIPPED);
+
+		when(orderRepository.findByStatus(OrderStatus.SHIPPED)).thenReturn(List.of(order1, order2));
+
+		// Act
+		List<Order> result = orderQueryService.findByStatus(OrderStatus.SHIPPED);
+
+		// Assert
+		assertThat(result).hasSize(2).allMatch(order -> order.getStatus() == OrderStatus.SHIPPED);
+	}
+
+	// ---------------------------------------------------------------------
+	// Helper
+	// ---------------------------------------------------------------------
+
+	/**
+	 * Creates a minimal valid Order entity for testing. Adjust fields only if your
+	 * domain model changes.
+	 */
+	private Order createOrder(Long id, String code, OrderStatus status) {
+	    Order order = new Order();
+	    order.setId(id);
+	    order.setCode(code);
+	    order.setStatus(status);
+	    order.setTotal(BigDecimal.valueOf(99.90));
+	    order.setCreatedAt(Instant.now()); // FIX: Instant instead of LocalDateTime
+	    return order;
 	}
 }

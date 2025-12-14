@@ -1,30 +1,41 @@
 package ch.devprojects.orderflow.dto;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Simple paging wrapper for OrderResponseDto instances.
+ * Response wrapper for paginated order search results.
  *
- * We use this instead of Spring's Page<> type to: - keep the JSON response
- * stable, - decouple the API contract from Spring Data internals, - have a
- * clear, interview-friendly structure.
+ * Important: - content is List<OrderResponseDto> (not entities) - "content"
+ * naming matches Page-like semantics and your current MVC tests
  */
 public class OrdersPageResponse {
 
-	// Actual slice of orders for the current page
-	private List<OrderResponseDto> content;
+	private List<OrderResponseDto> content = new ArrayList<>();
 
-	// 0-based page index requested by the client
 	private int page;
-
-	// Page size requested by the client
 	private int size;
 
-	// Total number of orders matching the filter (across all pages)
 	private long totalElements;
-
-	// Total number of pages (derived from totalElements and size)
 	private int totalPages;
+
+	private boolean first;
+	private boolean last;
+
+	public OrdersPageResponse() {
+		// default constructor for JSON serialization
+	}
+
+	public OrdersPageResponse(List<OrderResponseDto> content, int page, int size, long totalElements, int totalPages,
+			boolean first, boolean last) {
+		this.content = content;
+		this.page = page;
+		this.size = size;
+		this.totalElements = totalElements;
+		this.totalPages = totalPages;
+		this.first = first;
+		this.last = last;
+	}
 
 	public List<OrderResponseDto> getContent() {
 		return content;
@@ -64,5 +75,21 @@ public class OrdersPageResponse {
 
 	public void setTotalPages(int totalPages) {
 		this.totalPages = totalPages;
+	}
+
+	public boolean isFirst() {
+		return first;
+	}
+
+	public void setFirst(boolean first) {
+		this.first = first;
+	}
+
+	public boolean isLast() {
+		return last;
+	}
+
+	public void setLast(boolean last) {
+		this.last = last;
 	}
 }
