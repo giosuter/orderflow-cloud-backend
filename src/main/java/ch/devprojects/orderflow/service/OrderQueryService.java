@@ -4,15 +4,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import ch.devprojects.orderflow.domain.Order;
 import ch.devprojects.orderflow.domain.OrderStatus;
@@ -20,16 +13,37 @@ import ch.devprojects.orderflow.dto.OrderResponseDto;
 import ch.devprojects.orderflow.dto.OrdersPageResponse;
 import ch.devprojects.orderflow.repository.OrderRepository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
+import org.springframework.data.jpa.domain.Specification;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 /**
  * Read-only query service for Orders.
  *
- * Controller contract: - OrderQueryController expects OrdersPageResponse
- * (DTO-based). - This service builds specifications, executes paged queries,
- * and maps entities to DTOs.
+ * Responsibilities: - Build Specifications for optional filters - Apply
+ * server-side pagination and sorting - Map entities to DTOs for the API
+ * response contract
  */
 @Service
 @Transactional(readOnly = true)
 public class OrderQueryService {
+
+	private static final int DEFAULT_SIZE = 20;
+	private static final int MAX_SIZE = 200;
+
+	/**
+	 * Whitelist of allowed sort fields to prevent exposing arbitrary JPA fields.
+	 *
+	 * These names must match actual Order entity field names.
+	 */
+	private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt", "code", "customerName", "total",
+			"status");
 
 	private final OrderRepository orderRepository;
 
@@ -51,13 +65,20 @@ public class OrderQueryService {
 
 	/**
 	 * Search endpoint used by Angular: GET
-	 * /api/orders/search?customer=&status=&page=&size=
+	 * /api/orders/search?customer=&status=&page=&size=&sortBy=&sortDir=
 	 *
-	 * "customer" currently matches code OR customerName (contains, ignore case).
+	 * Filters: - customer: contains match against code OR customerName (ignore
+	 * case) - status: exact match on enum
+	 *
+	 * Sorting: - sortBy must be in ALLOWED_SORT_FIELDS; otherwise defaults to
+	 * createdAt - sortDir is asc/desc; otherwise defaults to desc
 	 */
-	public OrdersPageResponse findOrders(String customer, OrderStatus status, int page, int size) {
+	public OrdersPageResponse findOrders(String customer, OrderStatus status, int page, int size, String sortBy,
+			String sortDir) {
 
-		Pageable pageable = PageRequest.of(Math.max(0, page), normalizeSize(size), defaultSort());
+		Sort sort = buildSort(sortBy, sortDir);
+
+		Pageable pageable = PageRequest.of(Math.max(0, page), normalizeSize(size), sort);
 
 		Specification<Order> spec = Specification.where(null);
 
@@ -79,14 +100,14 @@ public class OrderQueryService {
 	}
 
 	// ---------------------------------------------------------------------
-	// Mapping
+	// Mapping: Entity -> DTO
 	// ---------------------------------------------------------------------
 
 	/**
-	 * Maps Order entity -> OrderResponseDto.
+	 * Converts Order entity to OrderResponseDto.
 	 *
-	 * Adjust the field mapping here if your OrderResponseDto uses different
-	 * property names.
+	 * Type conversions (important): - status: OrderStatus enum -> String -
+	 * createdAt: Instant -> LocalDateTime (UTC)
 	 */
 	private OrderResponseDto toOrderResponseDto(Order order) {
 		OrderResponseDto dto = new OrderResponseDto();
@@ -94,7 +115,6 @@ public class OrderQueryService {
 		dto.setId(order.getId());
 		dto.setCode(order.getCode());
 
-		// OrderStatus (enum) -> String
 		if (order.getStatus() != null) {
 			dto.setStatus(order.getStatus().name());
 		}
@@ -102,9 +122,10 @@ public class OrderQueryService {
 		dto.setCustomerName(order.getCustomerName());
 		dto.setTotal(order.getTotal());
 
-		// Instant -> LocalDateTime (UTC)
 		if (order.getCreatedAt() != null) {
 			dto.setCreatedAt(LocalDateTime.ofInstant(order.getCreatedAt(), ZoneOffset.UTC));
+		} else {
+			dto.setCreatedAt(null);
 		}
 
 		return dto;
@@ -131,14 +152,22 @@ public class OrderQueryService {
 
 	private int normalizeSize(int size) {
 		if (size <= 0) {
-			return 20;
+			return DEFAULT_SIZE;
 		}
-		return Math.min(size, 200);
+		return Math.min(size, MAX_SIZE);
 	}
 
-	private Sort defaultSort() {
-		// If your entity does not have "createdAt", change to
-		// Sort.by("id").descending()
-		return Sort.by(Sort.Direction.DESC, "createdAt");
+	private Sort buildSort(String sortBy, String sortDir) {
+		String safeSortBy = (sortBy != null) ? sortBy.trim() : "";
+		if (!ALLOWED_SORT_FIELDS.contains(safeSortBy)) {
+			safeSortBy = "createdAt";
+		}
+
+		Sort.Direction direction = Sort.Direction.DESC;
+		if (sortDir != null && "asc".equalsIgnoreCase(sortDir.trim())) {
+			direction = Sort.Direction.ASC;
+		}
+
+		return Sort.by(direction, safeSortBy);
 	}
 }

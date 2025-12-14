@@ -13,11 +13,13 @@ import ch.devprojects.orderflow.service.OrderQueryService;
 /**
  * Read-only query endpoints for Orders.
  *
- * Current contract used by the Angular list page: GET
- * /api/orders/search?customer=&status=&page=&size=
+ * Contract used by the Angular list page: GET
+ * /api/orders/search?customer=&status=&page=&size=&sortBy=&sortDir=
  *
- * Notes: - "customer" is currently a free-text term that matches code OR
- * customerName. - "status" is an optional OrderStatus enum.
+ * Notes: - "customer" is a free-text term that matches code OR customerName. -
+ * "status" is an optional OrderStatus enum. - Sorting is server-side: sortBy:
+ * createdAt|code|customerName|total|status (default: createdAt) sortDir:
+ * asc|desc (default: desc)
  */
 @RestController
 @RequestMapping("/api/orders")
@@ -33,9 +35,11 @@ public class OrderQueryController {
 	public ResponseEntity<OrdersPageResponse> search(@RequestParam(name = "customer", required = false) String customer,
 			@RequestParam(name = "status", required = false) OrderStatus status,
 			@RequestParam(name = "page", defaultValue = "0") int page,
-			@RequestParam(name = "size", defaultValue = "20") int size) {
+			@RequestParam(name = "size", defaultValue = "20") int size,
+			@RequestParam(name = "sortBy", defaultValue = "createdAt") String sortBy,
+			@RequestParam(name = "sortDir", defaultValue = "desc") String sortDir) {
 
-		OrdersPageResponse response = orderQueryService.findOrders(customer, status, page, size);
+		OrdersPageResponse response = orderQueryService.findOrders(customer, status, page, size, sortBy, sortDir);
 		return ResponseEntity.ok(response);
 	}
 }

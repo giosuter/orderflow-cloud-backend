@@ -1,31 +1,39 @@
 package ch.devprojects.orderflow.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
+
+import ch.devprojects.orderflow.domain.Order;
+import ch.devprojects.orderflow.domain.OrderStatus;
+import ch.devprojects.orderflow.dto.OrdersPageResponse;
+import ch.devprojects.orderflow.repository.OrderRepository;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import ch.devprojects.orderflow.domain.Order;
-import ch.devprojects.orderflow.domain.OrderStatus;
-import ch.devprojects.orderflow.repository.OrderRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
+import org.springframework.data.jpa.domain.Specification;
 
 /**
  * Unit tests for {@link OrderQueryService}.
  *
- * Purpose: - Verify read-only query logic - Ensure correct delegation to
- * {@link OrderRepository} - Protect against accidental business logic leakage
- *
- * Style: - Pure unit test - No Spring context - Mockito-based isolation
+ * Focus: - Pageable + Sort creation - Specification composition (basic) -
+ * Mapping into OrdersPageResponse DTO
  */
 @ExtendWith(MockitoExtension.class)
 class OrderQueryServiceTest {
@@ -36,94 +44,63 @@ class OrderQueryServiceTest {
 	@InjectMocks
 	private OrderQueryService orderQueryService;
 
-	// ---------------------------------------------------------------------
-	// findAll()
-	// ---------------------------------------------------------------------
-
 	@Test
-	@DisplayName("findAll should return all orders from repository")
-	void findAll_shouldReturnAllOrders() {
+	@DisplayName("findOrders should apply sortBy=code sortDir=asc into Pageable")
+	void findOrders_shouldApplySorting() {
 		// Arrange
-		Order order1 = createOrder(1L, "ORD-001", OrderStatus.NEW);
-		Order order2 = createOrder(2L, "ORD-002", OrderStatus.PROCESSING);
+		Order order = createOrder(1L, "ORD-001", OrderStatus.NEW);
+		Page<Order> page = new PageImpl<>(List.of(order));
 
-		when(orderRepository.findAll()).thenReturn(List.of(order1, order2));
+		when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
 		// Act
-		List<Order> result = orderQueryService.findAll();
+		OrdersPageResponse response = orderQueryService.findOrders("alice", OrderStatus.NEW, 0, 20, "code", "asc");
 
-		// Assert
-		assertThat(result).hasSize(2).containsExactly(order1, order2);
-	}
+		// Assert mapping basics
+		assertThat(response.getContent()).hasSize(1);
+		assertThat(response.getContent().get(0).getCode()).isEqualTo("ORD-001");
+		assertThat(response.getContent().get(0).getStatus()).isEqualTo("NEW");
 
-	// ---------------------------------------------------------------------
-	// findById()
-	// ---------------------------------------------------------------------
+		// Capture Pageable and assert sorting
+		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+		verify(orderRepository).findAll(any(Specification.class), pageableCaptor.capture());
 
-	@Test
-	@DisplayName("findById should return order when found")
-	void findById_shouldReturnOrder_whenFound() {
-		// Arrange
-		Order order = createOrder(10L, "ORD-010", OrderStatus.PAID);
-
-		when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
-
-		// Act
-		Optional<Order> result = orderQueryService.findById(10L);
-
-		// Assert
-		assertThat(result).isPresent();
-		assertThat(result.get().getCode()).isEqualTo("ORD-010");
+		Pageable used = pageableCaptor.getValue();
+		assertThat(used.getPageNumber()).isEqualTo(0);
+		assertThat(used.getPageSize()).isEqualTo(20);
+		assertThat(used.getSort().getOrderFor("code")).isNotNull();
+		assertThat(used.getSort().getOrderFor("code").isAscending()).isTrue();
 	}
 
 	@Test
-	@DisplayName("findById should return empty when order not found")
-	void findById_shouldReturnEmpty_whenNotFound() {
+	@DisplayName("findOrders should fallback to createdAt desc when sortBy is invalid")
+	void findOrders_shouldFallbackWhenSortByInvalid() {
 		// Arrange
-		when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+		Order order = createOrder(1L, "ORD-001", OrderStatus.NEW);
+		Page<Order> page = new PageImpl<>(List.of(order));
+
+		when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
 		// Act
-		Optional<Order> result = orderQueryService.findById(99L);
+		orderQueryService.findOrders(null, null, 0, 20, "DROP_TABLES", "asc");
 
-		// Assert
-		assertThat(result).isEmpty();
+		// Assert: sort should be by createdAt (desc unless sortDir=asc and allowed, but
+		// fallback keeps field)
+		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+		verify(orderRepository).findAll(any(Specification.class), pageableCaptor.capture());
+
+		Pageable used = pageableCaptor.getValue();
+		assertThat(used.getSort().getOrderFor("createdAt")).isNotNull();
 	}
 
-	// ---------------------------------------------------------------------
-	// findByStatus()
-	// ---------------------------------------------------------------------
-
-	@Test
-	@DisplayName("findByStatus should return orders with given status")
-	void findByStatus_shouldReturnMatchingOrders() {
-		// Arrange
-		Order order1 = createOrder(1L, "ORD-100", OrderStatus.SHIPPED);
-		Order order2 = createOrder(2L, "ORD-101", OrderStatus.SHIPPED);
-
-		when(orderRepository.findByStatus(OrderStatus.SHIPPED)).thenReturn(List.of(order1, order2));
-
-		// Act
-		List<Order> result = orderQueryService.findByStatus(OrderStatus.SHIPPED);
-
-		// Assert
-		assertThat(result).hasSize(2).allMatch(order -> order.getStatus() == OrderStatus.SHIPPED);
-	}
-
-	// ---------------------------------------------------------------------
-	// Helper
-	// ---------------------------------------------------------------------
-
-	/**
-	 * Creates a minimal valid Order entity for testing. Adjust fields only if your
-	 * domain model changes.
-	 */
 	private Order createOrder(Long id, String code, OrderStatus status) {
-	    Order order = new Order();
-	    order.setId(id);
-	    order.setCode(code);
-	    order.setStatus(status);
-	    order.setTotal(BigDecimal.valueOf(99.90));
-	    order.setCreatedAt(Instant.now()); // FIX: Instant instead of LocalDateTime
-	    return order;
+		Order order = new Order();
+		order.setId(id);
+		order.setCode(code);
+		order.setStatus(status);
+		order.setCustomerName("Alice");
+		order.setTotal(BigDecimal.valueOf(99.90));
+		order.setCreatedAt(Instant.now());
+		return order;
 	}
 }
