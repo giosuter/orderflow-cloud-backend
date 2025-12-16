@@ -38,3 +38,4 @@ node_modules/
 dist/
 
 Jenkinsfile.backup
+flyway-prod.conf

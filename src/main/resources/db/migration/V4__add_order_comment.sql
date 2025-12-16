@@ -1,0 +1,2 @@
+ALTER TABLE orders
+  ADD COLUMN comment VARCHAR(2000) NULL;
