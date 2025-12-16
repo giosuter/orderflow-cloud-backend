@@ -50,8 +50,8 @@ This is intentional. Frontend code must always use the canonical URLs **exactly 
 
 **Examples (local dev):**
 
-- ✅ Supported: `GET http://localhost:8080/orderflow-api/api/orders`
-- ⛔ Not supported: `GET http://localhost:8080/orderflow-api/api/orders/`
+- Supported: `GET http://localhost:8080/orderflow-api/api/orders`
+- Not supported: `GET http://localhost:8080/orderflow-api/api/orders/`
 
 ---
 

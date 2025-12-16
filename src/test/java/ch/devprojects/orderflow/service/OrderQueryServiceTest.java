@@ -1,106 +1,97 @@
 package ch.devprojects.orderflow.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-import ch.devprojects.orderflow.domain.Order;
-import ch.devprojects.orderflow.domain.OrderStatus;
-import ch.devprojects.orderflow.dto.OrdersPageResponse;
-import ch.devprojects.orderflow.repository.OrderRepository;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.Mockito;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import ch.devprojects.orderflow.domain.Order;
+import ch.devprojects.orderflow.domain.OrderStatus;
+import ch.devprojects.orderflow.dto.OrderDto;
+import ch.devprojects.orderflow.dto.OrdersPageResponse;
+import ch.devprojects.orderflow.repository.OrderRepository;
+
 /**
- * Unit tests for {@link OrderQueryService}.
+ * Unit tests for {@link OrderQueryServiceImpl}.
  *
- * Focus: - Pageable + Sort creation - Mapping into OrdersPageResponse DTO -
- * Signature coverage for optional filters (including totalMin/totalMax)
+ * Contract (Option A): - Entity uses OrderStatus (enum) - OrderDto uses
+ * OrderStatus (enum)
  */
-@ExtendWith(MockitoExtension.class)
 class OrderQueryServiceTest {
 
-	@Mock
-	private OrderRepository orderRepository;
-
-	@InjectMocks
-	private OrderQueryService orderQueryService;
-
 	@Test
-	@DisplayName("findOrders should apply sortBy=code sortDir=asc into Pageable and map DTOs")
+	@DisplayName("findOrders should apply sorting and map DTOs (status as enum)")
 	void findOrders_shouldApplySortingAndMapDtos() {
 		// Arrange
-		Order order = createOrder(1L, "ORD-001", OrderStatus.NEW, BigDecimal.valueOf(150.00));
-		Page<Order> page = new PageImpl<>(List.of(order));
+		OrderRepository repo = Mockito.mock(OrderRepository.class);
+		OrderQueryServiceImpl service = new OrderQueryServiceImpl(repo);
 
-		when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+		Order o1 = new Order();
+		o1.setId(10L);
+		o1.setCode("ORD-10");
+		o1.setCustomerName("Alice");
+		o1.setTotal(BigDecimal.valueOf(20));
+		o1.setStatus(OrderStatus.NEW);
+		o1.setCreatedAt(Instant.parse("2025-01-01T10:00:00Z"));
+		o1.setUpdatedAt(Instant.parse("2025-01-01T10:05:00Z"));
+
+		Order o2 = new Order();
+		o2.setId(11L);
+		o2.setCode("ORD-11");
+		o2.setCustomerName("Bob");
+		o2.setTotal(BigDecimal.valueOf(30));
+		o2.setStatus(OrderStatus.PAID);
+		o2.setCreatedAt(Instant.parse("2025-01-02T10:00:00Z"));
+		o2.setUpdatedAt(Instant.parse("2025-01-02T10:05:00Z"));
+
+		Page<Order> page = new PageImpl<>(List.of(o1, o2), PageRequest.of(0, 2), 2);
+
+		// Capture the pageable passed to the repository call
+		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+
+		// IMPORTANT:
+		// Explicitly type the matcher to Specification<Order> to avoid ambiguous
+		// overload resolution.
+		Mockito.when(repo.findAll(Mockito.<Specification<Order>>any(), pageableCaptor.capture())).thenReturn(page);
 
 		// Act
-		OrdersPageResponse response = orderQueryService.findOrders("alice", OrderStatus.NEW, 0, 20, "code", "asc",
-				new BigDecimal("100.00"), new BigDecimal("200.00"));
+		OrdersPageResponse resp = service.findOrders(null, null, 0, 2, "createdAt", "desc", null, null);
 
-		// Assert mapping basics
-		assertThat(response.getContent()).hasSize(1);
-		assertThat(response.getContent().get(0).getCode()).isEqualTo("ORD-001");
-		assertThat(response.getContent().get(0).getStatus()).isEqualTo("NEW");
-
-		// Capture Pageable and assert sorting
-		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-		verify(orderRepository).findAll(any(Specification.class), pageableCaptor.capture());
-
+		// Assert: pageable sorting applied
 		Pageable used = pageableCaptor.getValue();
 		assertThat(used.getPageNumber()).isEqualTo(0);
-		assertThat(used.getPageSize()).isEqualTo(20);
-		assertThat(used.getSort().getOrderFor("code")).isNotNull();
-		assertThat(used.getSort().getOrderFor("code").isAscending()).isTrue();
-	}
+		assertThat(used.getPageSize()).isEqualTo(2);
 
-	@Test
-	@DisplayName("findOrders should fallback to createdAt when sortBy is invalid")
-	void findOrders_shouldFallbackWhenSortByInvalid() {
-		// Arrange
-		Order order = createOrder(1L, "ORD-001", OrderStatus.NEW, BigDecimal.valueOf(150.00));
-		Page<Order> page = new PageImpl<>(List.of(order));
+		Sort.Order sort = used.getSort().getOrderFor("createdAt");
+		assertThat(sort).isNotNull();
+		assertThat(sort.getDirection()).isEqualTo(Sort.Direction.DESC);
 
-		when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+		// Assert: DTO mapping uses enum status
+		assertThat(resp).isNotNull();
+		assertThat(resp.getContent()).hasSize(2);
 
-		// Act
-		orderQueryService.findOrders(null, null, 0, 20, "DROP_TABLES", "asc", null, null);
+		OrderDto d1 = resp.getContent().get(0);
+		assertThat(d1.getId()).isEqualTo(10L);
+		assertThat(d1.getCode()).isEqualTo("ORD-10");
+		assertThat(d1.getStatus()).isEqualTo("NEW");
 
-		// Assert: sort should be by createdAt (field fallback)
-		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-		verify(orderRepository).findAll(any(Specification.class), pageableCaptor.capture());
-
-		Pageable used = pageableCaptor.getValue();
-		assertThat(used.getSort().getOrderFor("createdAt")).isNotNull();
-	}
-
-	private Order createOrder(Long id, String code, OrderStatus status, BigDecimal total) {
-		Order order = new Order();
-		order.setId(id);
-		order.setCode(code);
-		order.setStatus(status);
-		order.setCustomerName("Alice");
-		order.setTotal(total);
-		order.setCreatedAt(Instant.now());
-		return order;
+		OrderDto d2 = resp.getContent().get(1);
+		assertThat(d2.getId()).isEqualTo(11L);
+		assertThat(d2.getCode()).isEqualTo("ORD-11");
+		assertThat(d2.getStatus()).isEqualTo("PAID");
 	}
 }

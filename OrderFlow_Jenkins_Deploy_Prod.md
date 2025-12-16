@@ -161,10 +161,10 @@ pipeline {
 
   post {
     success {
-      echo '✅ Production deployment succeeded.'
+      echo 'Production deployment succeeded.'
     }
     failure {
-      echo '❌ Production deployment failed.'
+      echo 'Production deployment failed.'
     }
     always {
       archiveArtifacts artifacts: 'target/*.war', fingerprint: true, onlyIfSuccessful: false
@@ -277,7 +277,7 @@ EOF
 
 ---
 
-### Done 🎯
+### Done
 
 You now have:
 - A committed **Jenkinsfile.prod**

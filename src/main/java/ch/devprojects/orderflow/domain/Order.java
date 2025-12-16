@@ -2,8 +2,23 @@ package ch.devprojects.orderflow.domain;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import jakarta.persistence.*;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+/**
+ * JPA entity representing an Order.
+ *
+ * Important: - DB table is "orders" (see Flyway V1). - "description" is the
+ * canonical free-text field (replaces former "comment"). - Keep the entity
+ * simple (no business logic here).
+ */
 @Entity
 @Table(name = "orders")
 public class Order {
@@ -12,78 +27,112 @@ public class Order {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@Column(nullable = false, length = 64, unique = true)
+	/**
+	 * Business code / human friendly identifier (e.g. "ORD-1001"). Must be unique
+	 * (see Flyway V1).
+	 */
+	@Column(nullable = false, unique = true)
 	private String code;
-	
+
+	/**
+	 * Order lifecycle status stored as a String enum name (e.g. NEW, PAID).
+	 */
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	private OrderStatus status;
+
+	/**
+	 * Total amount of the order.
+	 */
+	@Column(nullable = false)
+	private BigDecimal total;
+
+	/**
+	 * Optional customer name (added by Flyway V3).
+	 */
 	@Column(name = "customer_name")
 	private String customerName;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 32)
-	private OrderStatus status = OrderStatus.NEW;
+	/**
+	 * Canonical free-text field for orders.
+	 *
+	 * Replaces the old "comment" naming everywhere: - DB column: orders.description
+	 * (Flyway V4) - API field: description (DTOs) - Frontend field: description
+	 */
+	@Column(length = 2000)
+	private String description;
 
-	@Column(nullable = false, precision = 19, scale = 2)
-	private BigDecimal total = BigDecimal.ZERO;
+	/**
+	 * Timestamps (kept as Instant for timezone-safe persistence and JSON).
+	 */
+	@Column(name = "created_at")
+	private Instant createdAt;
 
-	@Column(nullable = false, updatable = false)
-	private Instant createdAt = Instant.now();
-
-	@Column(nullable = false)
-	private Instant updatedAt = Instant.now();
+	@Column(name = "updated_at")
+	private Instant updatedAt;
 
 	public Order() {
+		// JPA needs a default constructor
 	}
 
 	public Long getId() {
 		return id;
 	}
 
-	public void setId(Long id) {
-		this.id = id;
-	}
-
 	public String getCode() {
 		return code;
-	}
-
-	public void setCode(String code) {
-		this.code = code;
-	}
-	
-	public String getCustomerName() {
-	    return customerName;
-	}
-
-	public void setCustomerName(String customerName) {
-	    this.customerName = customerName;
 	}
 
 	public OrderStatus getStatus() {
 		return status;
 	}
 
-	public void setStatus(OrderStatus status) {
-		this.status = status;
-	}
-
 	public BigDecimal getTotal() {
 		return total;
 	}
 
-	public void setTotal(BigDecimal total) {
-		this.total = total;
+	public String getCustomerName() {
+		return customerName;
+	}
+
+	public String getDescription() {
+		return description;
 	}
 
 	public Instant getCreatedAt() {
 		return createdAt;
 	}
 
-	public void setCreatedAt(Instant createdAt) {
-		this.createdAt = createdAt;
-	}
-
 	public Instant getUpdatedAt() {
 		return updatedAt;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
+
+	public void setCode(String code) {
+		this.code = code;
+	}
+
+	public void setStatus(OrderStatus status) {
+		this.status = status;
+	}
+
+	public void setTotal(BigDecimal total) {
+		this.total = total;
+	}
+
+	public void setCustomerName(String customerName) {
+		this.customerName = customerName;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	public void setCreatedAt(Instant createdAt) {
+		this.createdAt = createdAt;
 	}
 
 	public void setUpdatedAt(Instant updatedAt) {

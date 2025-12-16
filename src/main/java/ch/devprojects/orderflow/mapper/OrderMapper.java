@@ -2,92 +2,176 @@ package ch.devprojects.orderflow.mapper;
 
 import java.time.Instant;
 
+import org.springframework.stereotype.Component;
+
 import ch.devprojects.orderflow.domain.Order;
+import ch.devprojects.orderflow.domain.OrderStatus;
 import ch.devprojects.orderflow.dto.OrderDto;
+import ch.devprojects.orderflow.dto.OrderResponseDto;
 
 /**
- * Manual mapper between JPA entity and API DTO.
+ * Manual mapper between the Order JPA entity and DTOs.
  *
- * This version maps ALL relevant fields including customerName.
- * - toDto: entity -> dto (for responses)
- * - toEntity: dto -> new entity (for create)
- * - updateEntityFromDto: dto -> existing entity (for update)
+ * Naming note (important for your current codebase): - Your existing unit tests
+ * expect: - toEntity(OrderDto) - updateEntityFromDto(OrderDto, Order)
+ *
+ * - Your service layer (as we refactored it) uses more explicit names: -
+ * toEntityForCreate(OrderDto) - applyToExistingEntityForUpdate(OrderDto, Order)
+ *
+ * To keep the project consistent AND avoid breaking tests, this mapper provides
+ * BOTH: - The explicit methods (preferred for services) - Compatibility
+ * wrappers (delegate to the explicit ones)
+ *
+ * Key detail for this task: - The canonical free-text field is "description"
+ * (replaces old "comment"). - DTO accepts legacy JSON "comment" via @JsonAlias
+ * on the DTO field.
  */
+@Component
 public class OrderMapper {
 
-    public OrderDto toDto(Order entity) {
-        if (entity == null) {
-            return null;
-        }
+	/**
+	 * Maps an Order entity to an OrderDto (used for list/search).
+	 */
+	public OrderDto toDto(Order order) {
+		if (order == null) {
+			return null;
+		}
 
-        OrderDto dto = new OrderDto();
-        dto.setId(entity.getId());
-        dto.setCode(entity.getCode());
-        dto.setStatus(entity.getStatus());
-        dto.setTotal(entity.getTotal());
-        dto.setCustomerName(entity.getCustomerName());   // <-- NEW
-        dto.setCreatedAt(entity.getCreatedAt());
-        dto.setUpdatedAt(entity.getUpdatedAt());
-        return dto;
-    }
+		OrderDto dto = new OrderDto();
+		dto.setId(order.getId());
+		dto.setCode(order.getCode());
+		dto.setCustomerName(order.getCustomerName());
+		dto.setTotal(order.getTotal());
+		dto.setCreatedAt(order.getCreatedAt());
+		dto.setUpdatedAt(order.getUpdatedAt());
 
-    public Order toEntity(OrderDto dto) {
-        if (dto == null) {
-            return null;
-        }
+		// Entity enum -> DTO string (contract for frontend)
+		dto.setStatus(order.getStatus() == null ? null : order.getStatus().name());
 
-        Order entity = new Order();
-        entity.setCode(dto.getCode());
-        entity.setStatus(dto.getStatus());
-        entity.setTotal(dto.getTotal());
-        entity.setCustomerName(dto.getCustomerName());   // <-- NEW
+		// Critical rename: comment -> description
+		dto.setDescription(order.getDescription());
 
-        if (dto.getCreatedAt() != null) {
-            entity.setCreatedAt(dto.getCreatedAt());
-        }
-        if (dto.getUpdatedAt() != null) {
-            entity.setUpdatedAt(dto.getUpdatedAt());
-        }
+		return dto;
+	}
 
-        return entity;
-    }
+	/**
+	 * Maps an Order entity to an OrderResponseDto (used for detail endpoints, if
+	 * needed).
+	 */
+	public OrderResponseDto toResponseDto(Order order) {
+		if (order == null) {
+			return null;
+		}
 
-    public void updateEntityFromDto(OrderDto dto, Order entity) {
-        if (dto == null || entity == null) {
-            return;
-        }
+		OrderResponseDto dto = new OrderResponseDto();
+		dto.setId(order.getId());
+		dto.setCode(order.getCode());
+		dto.setCustomerName(order.getCustomerName());
+		dto.setTotal(order.getTotal());
+		dto.setCreatedAt(order.getCreatedAt());
+		dto.setUpdatedAt(order.getUpdatedAt());
+		dto.setStatus(order.getStatus() == null ? null : order.getStatus().name());
+		dto.setDescription(order.getDescription());
+		return dto;
+	}
 
-        boolean changed = false;
+	/*
+	 * -----------------------------------------------------------------------
+	 * Preferred explicit methods used by the service layer
+	 * ---------------------------------------------------------------------
+	 */
 
-        if (dto.getCode() != null && !dto.getCode().equals(entity.getCode())) {
-            entity.setCode(dto.getCode());
-            changed = true;
-        }
+	/**
+	 * Creates a NEW Order entity for a create operation.
+	 *
+	 * Notes: - status defaults to NEW if not provided - timestamps are initialized
+	 * here for consistent behavior - description is optional, but persisted if
+	 * present
+	 */
+	public Order toEntityForCreate(OrderDto dto) {
+		if (dto == null) {
+			return null;
+		}
 
-        if (dto.getStatus() != null && dto.getStatus() != entity.getStatus()) {
-            entity.setStatus(dto.getStatus());
-            changed = true;
-        }
+		Order entity = new Order();
+		entity.setCode(dto.getCode());
+		entity.setCustomerName(dto.getCustomerName());
+		entity.setTotal(dto.getTotal());
 
-        if (dto.getTotal() != null &&
-                (entity.getTotal() == null || dto.getTotal().compareTo(entity.getTotal()) != 0)) {
-            entity.setTotal(dto.getTotal());
-            changed = true;
-        }
+		// default NEW for creates when missing
+		entity.setStatus(parseStatus(dto.getStatus(), OrderStatus.NEW));
 
-        if (dto.getCustomerName() != null &&
-                (entity.getCustomerName() == null || !dto.getCustomerName().equals(entity.getCustomerName()))) {
-            entity.setCustomerName(dto.getCustomerName());
-            changed = true;
-        }
+		// Canonical rename: comment -> description
+		entity.setDescription(dto.getDescription());
 
-        if (dto.getCreatedAt() != null && !dto.getCreatedAt().equals(entity.getCreatedAt())) {
-            entity.setCreatedAt(dto.getCreatedAt());
-            changed = true;
-        }
+		Instant now = Instant.now();
+		entity.setCreatedAt(now);
+		entity.setUpdatedAt(now);
 
-        if (changed) {
-            entity.setUpdatedAt(Instant.now());
-        }
-    }
+		return entity;
+	}
+
+	/**
+	 * Updates an EXISTING Order entity for an update operation.
+	 *
+	 * Notes: - keeps createdAt untouched - updates updatedAt timestamp - if status
+	 * is missing, keeps existing status
+	 */
+	public void applyToExistingEntityForUpdate(OrderDto dto, Order entity) {
+		if (dto == null || entity == null) {
+			return;
+		}
+
+		entity.setCode(dto.getCode());
+		entity.setCustomerName(dto.getCustomerName());
+		entity.setTotal(dto.getTotal());
+
+		entity.setStatus(parseStatus(dto.getStatus(), entity.getStatus()));
+
+		// Canonical rename: comment -> description
+		entity.setDescription(dto.getDescription());
+
+		entity.setUpdatedAt(Instant.now());
+	}
+
+	/*
+	 * -----------------------------------------------------------------------
+	 * Compatibility methods expected by your current unit tests
+	 * ---------------------------------------------------------------------
+	 */
+
+	/**
+	 * Compatibility wrapper for existing tests/code.
+	 *
+	 * Equivalent to "create a new entity from the DTO". Delegates to
+	 * {@link #toEntityForCreate(OrderDto)}.
+	 */
+	public Order toEntity(OrderDto dto) {
+		return toEntityForCreate(dto);
+	}
+
+	/**
+	 * Compatibility wrapper for existing tests/code.
+	 *
+	 * Equivalent to "update an existing entity from the DTO". Delegates to
+	 * {@link #applyToExistingEntityForUpdate(OrderDto, Order)}.
+	 */
+	public void updateEntityFromDto(OrderDto dto, Order entity) {
+		applyToExistingEntityForUpdate(dto, entity);
+	}
+
+	/**
+	 * Converts DTO status string (e.g. "paid") to enum (PAID). If null/blank,
+	 * returns the provided default.
+	 */
+	private OrderStatus parseStatus(String status, OrderStatus defaultValue) {
+		if (status == null) {
+			return defaultValue;
+		}
+		String s = status.trim();
+		if (s.isEmpty()) {
+			return defaultValue;
+		}
+		return OrderStatus.valueOf(s.toUpperCase());
+	}
 }

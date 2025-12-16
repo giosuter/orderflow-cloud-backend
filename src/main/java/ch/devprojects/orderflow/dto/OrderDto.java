@@ -3,40 +3,42 @@ package ch.devprojects.orderflow.dto;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-import ch.devprojects.orderflow.domain.OrderStatus;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 /**
- * OrderDto is the request/response contract for the Order API. Validation runs
- * here so invalid requests fail with HTTP 422. 'status' is an OrderStatus enum,
- * not a String.
+ * DTO used for create/update and also for list/search responses.
+ *
+ * Contract (stable for REST + Angular): - status is a String enum name ("NEW",
+ * "PAID", ...) - description is the canonical free-text field
+ *
+ * Backward compatibility: - older clients might still send "comment" -> we
+ * accept it via @JsonAlias
  */
 public class OrderDto {
 
 	private Long id;
-
-	@NotBlank(message = "code must not be blank")
 	private String code;
-
-	@NotNull(message = "status must not be null")
-	private OrderStatus status; // <-- use enum type (fix)
-
-	@NotNull(message = "total must not be null")
-	@DecimalMin(value = "0.00", inclusive = false, message = "total must be > 0")
-	private BigDecimal total;
-
-	// Optional API-only field (not stored in DB/entity yet)
 	private String customerName;
+	private BigDecimal total;
 
 	private Instant createdAt;
 	private Instant updatedAt;
 
+	/**
+	 * Enum name as String to keep the API simple for frontend clients.
+	 */
+	private String status;
+
+	/**
+	 * Canonical name (replaces comment). JsonAlias allows accepting "comment" from
+	 * older payloads.
+	 */
+	@JsonAlias("comment")
+	private String description;
+
 	public OrderDto() {
 	}
 
-	// --- Getters / Setters ---
 	public Long getId() {
 		return id;
 	}
@@ -53,13 +55,13 @@ public class OrderDto {
 		this.code = code;
 	}
 
-	public OrderStatus getStatus() {
-		return status;
-	} // <-- enum getter
+	public String getCustomerName() {
+		return customerName;
+	}
 
-	public void setStatus(OrderStatus status) {
-		this.status = status;
-	} // <-- enum setter
+	public void setCustomerName(String customerName) {
+		this.customerName = customerName;
+	}
 
 	public BigDecimal getTotal() {
 		return total;
@@ -67,14 +69,6 @@ public class OrderDto {
 
 	public void setTotal(BigDecimal total) {
 		this.total = total;
-	}
-
-	public String getCustomerName() {
-		return customerName;
-	}
-
-	public void setCustomerName(String customerName) {
-		this.customerName = customerName;
 	}
 
 	public Instant getCreatedAt() {
@@ -91,5 +85,21 @@ public class OrderDto {
 
 	public void setUpdatedAt(Instant updatedAt) {
 		this.updatedAt = updatedAt;
+	}
+
+	public String getStatus() {
+		return status;
+	}
+
+	public void setStatus(String status) {
+		this.status = status;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 }

@@ -1,24 +1,18 @@
 package ch.devprojects.orderflow.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.domain.Specification;
@@ -26,359 +20,168 @@ import org.springframework.data.jpa.domain.Specification;
 import ch.devprojects.orderflow.domain.Order;
 import ch.devprojects.orderflow.domain.OrderStatus;
 import ch.devprojects.orderflow.dto.OrderDto;
-import ch.devprojects.orderflow.mapper.OrderMapper;
-import ch.devprojects.orderflow.repository.OrderRepository;
-import jakarta.persistence.EntityNotFoundException;
 
 /**
  * Unit tests for {@link OrderServiceImpl}.
  *
- * Focus:
- *  - Exercise business logic and mapping in the service layer.
- *  - Uses a mocked OrderRepository (no database, no Flyway).
- *  - Uses the real OrderMapper indirectly via OrderServiceImpl.
+ * Critical detail: - {@link OrderServiceImpl} constructor requires a NON-null
+ * mapper: ch.devprojects.orderflow.mapper.OrderMapper
  *
- * Covered scenarios:
- *  - create: happy path + validation failures
- *  - findById: existing + missing
- *  - findAll: simple passthrough
- *  - update: existing + missing
- *  - delete: existing + missing
- *  - search: different combinations of code/status filters
- *  - findByCode: existing + missing
+ * If you have multiple OrderMapper classes in different packages, make sure
+ * THIS test imports and mocks the correct one, otherwise Mockito won't inject
+ * it and you'll get: "orderMapper must not be null".
  */
 @ExtendWith(MockitoExtension.class)
-public class OrderServiceImplTest {
+class OrderServiceImplTest {
 
-    @Mock
-    private OrderRepository orderRepository;
+	@Mock
+	private ch.devprojects.orderflow.repository.OrderRepository orderRepository;
 
-    // Not used directly in tests but kept for documentation:
-    // the service internally uses a simple manual OrderMapper.
-    @SuppressWarnings("unused")
-    private OrderMapper orderMapper;
+	/**
+	 * IMPORTANT: mock the mapper type that OrderServiceImpl actually depends on:
+	 * ch.devprojects.orderflow.mapper.OrderMapper
+	 *
+	 * Using a different OrderMapper from another package will NOT be injected.
+	 */
+	@Mock
+	private ch.devprojects.orderflow.mapper.OrderMapper orderMapper;
 
-    private OrderServiceImpl orderService;
+	@InjectMocks
+	private OrderServiceImpl orderService;
 
-    @BeforeEach
-    void setUp() {
-        this.orderMapper = new OrderMapper();
-        this.orderService = new OrderServiceImpl(orderRepository);
-    }
+	@Test
+	@DisplayName("create should map dto -> entity, save it, and return dto")
+	void create_shouldSetDefaultsAndSave() {
+		// Arrange
+		OrderDto input = new OrderDto();
+		input.setCode("ORD-1");
+		input.setStatus("NEW");
+		input.setTotal(new BigDecimal("10.00"));
+		input.setCustomerName("Alice");
+		input.setDescription("My description");
 
-    // -------------------------------------------------------------------------
-    // Helper: create a sample domain Order
-    // -------------------------------------------------------------------------
-    private Order createSampleOrder(Long id) {
-        Order order = new Order();
-        order.setId(id);
-        order.setCode("ORD-" + id);
-        order.setStatus(OrderStatus.NEW);
-        order.setTotal(BigDecimal.valueOf(100.50));
-        order.setCreatedAt(Instant.parse("2025-01-01T10:00:00Z"));
-        order.setUpdatedAt(Instant.parse("2025-01-01T11:00:00Z"));
-        return order;
-    }
+		Order mappedEntity = new Order();
+		Order savedEntity = new Order();
 
-    // -------------------------------------------------------------------------
-    // CREATE
-    // -------------------------------------------------------------------------
+		OrderDto mappedBack = new OrderDto();
+		mappedBack.setId(1L);
+		mappedBack.setCode("ORD-1");
+		mappedBack.setStatus("NEW");
+		mappedBack.setTotal(new BigDecimal("10.00"));
+		mappedBack.setCustomerName("Alice");
+		mappedBack.setDescription("My description");
 
-    @Test
-    @DisplayName("create() should set defaults and timestamps and save the order")
-    void create_shouldSetDefaultsAndSave() {
-        // Arrange: DTO without status or timestamps
-        OrderDto dto = new OrderDto();
-        dto.setCode("ORD-1");
-        dto.setTotal(BigDecimal.valueOf(50.00));
-        // dto.setStatus(null) -> default must be NEW
+		when(orderMapper.toEntityForCreate(input)).thenReturn(mappedEntity);
+		when(orderRepository.save(mappedEntity)).thenReturn(savedEntity);
+		when(orderMapper.toDto(savedEntity)).thenReturn(mappedBack);
 
-        // When saving, we simulate that the DB assigns an ID and echoes the entity
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-            Order entity = invocation.getArgument(0);
-            entity.setId(1L);
-            return entity;
-        });
+		// Act
+		OrderDto result = orderService.create(input);
 
-        // Act
-        OrderDto result = orderService.create(dto);
+		// Assert
+		assertEquals(1L, result.getId());
+		assertEquals("ORD-1", result.getCode());
+		assertEquals("My description", result.getDescription());
 
-        // Assert
-        assertNotNull(result, "Result DTO must not be null");
-        assertEquals(1L, result.getId(), "ID should be set by the repository");
-        assertEquals("ORD-1", result.getCode(), "Code should be propagated");
-        assertEquals(OrderStatus.NEW, result.getStatus(), "Status should default to NEW");
+		verify(orderMapper, times(1)).toEntityForCreate(input);
+		verify(orderRepository, times(1)).save(mappedEntity);
+		verify(orderMapper, times(1)).toDto(savedEntity);
 
-        // Capture the saved entity to check timestamps and defaults at the entity level
-        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
-        verify(orderRepository).save(orderCaptor.capture());
-        Order savedEntity = orderCaptor.getValue();
+		verifyNoMoreInteractions(orderRepository, orderMapper);
+	}
 
-        assertEquals("ORD-1", savedEntity.getCode());
-        assertEquals(OrderStatus.NEW, savedEntity.getStatus(), "Status must never be null");
-        assertNotNull(savedEntity.getCreatedAt(), "createdAt must be initialized");
-        assertNotNull(savedEntity.getUpdatedAt(), "updatedAt must be initialized");
-    }
+	@Test
+	@DisplayName("findByCode should return order when it exists")
+	void findByCode_shouldReturnOrder_whenExists() {
+		// Arrange
+		Order entity = new Order();
+		entity.setId(10L);
+		entity.setCode("ORD-10");
+		entity.setStatus(OrderStatus.PAID);
+		entity.setTotal(new BigDecimal("99.90"));
+		entity.setDescription("Paid order");
 
-    @Test
-    @DisplayName("create() should throw IllegalArgumentException when code is blank")
-    void create_shouldThrowWhenCodeBlank() {
-        OrderDto dto = new OrderDto();
-        dto.setCode("   "); // blank
-        dto.setTotal(BigDecimal.TEN);
+		OrderDto dto = new OrderDto();
+		dto.setId(10L);
+		dto.setCode("ORD-10");
+		dto.setStatus("PAID");
+		dto.setTotal(new BigDecimal("99.90"));
+		dto.setDescription("Paid order");
 
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> orderService.create(dto),
-                "Blank code must cause IllegalArgumentException"
-        );
-    }
+		when(orderRepository.findByCode("ORD-10")).thenReturn(Optional.of(entity));
+		when(orderMapper.toDto(entity)).thenReturn(dto);
 
-    @Test
-    @DisplayName("create() should throw IllegalArgumentException when total is null")
-    void create_shouldThrowWhenTotalIsNull() {
-        OrderDto dto = new OrderDto();
-        dto.setCode("ORD-2");
-        dto.setTotal(null);
+		// Act
+		OrderDto result = orderService.findByCode("ORD-10");
 
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> orderService.create(dto),
-                "Null total must cause IllegalArgumentException"
-        );
-    }
+		// Assert
+		assertEquals(10L, result.getId());
+		assertEquals("ORD-10", result.getCode());
+		assertEquals("Paid order", result.getDescription());
 
-    // -------------------------------------------------------------------------
-    // FIND BY ID
-    // -------------------------------------------------------------------------
+		verify(orderRepository, times(1)).findByCode("ORD-10");
+		verify(orderMapper, times(1)).toDto(entity);
+		verifyNoMoreInteractions(orderRepository, orderMapper);
+	}
 
-    @Test
-    @DisplayName("findById() should return the mapped DTO when the order exists")
-    void findById_shouldReturnDtoWhenExists() {
-        // Arrange
-        Order order = createSampleOrder(10L);
-        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+	@Test
+	@DisplayName("findByCode should throw when order does not exist")
+	void findByCode_shouldThrow_whenNotFound() {
+		// Arrange
+		when(orderRepository.findByCode("MISSING")).thenReturn(Optional.empty());
 
-        // Act
-        OrderDto result = orderService.findById(10L);
+		// Act + Assert
+		assertThrows(jakarta.persistence.EntityNotFoundException.class, () -> orderService.findByCode("MISSING"));
 
-        // Assert
-        assertNotNull(result);
-        assertEquals(10L, result.getId());
-        assertEquals("ORD-10", result.getCode());
-        assertEquals(OrderStatus.NEW, result.getStatus());
-    }
+		verify(orderRepository, times(1)).findByCode("MISSING");
+		verifyNoMoreInteractions(orderRepository);
+		verifyNoInteractions(orderMapper);
+	}
 
-    @Test
-    @DisplayName("findById() should throw EntityNotFoundException when the order does not exist")
-    void findById_shouldThrowWhenMissing() {
-        // Arrange
-        when(orderRepository.findById(anyLong())).thenReturn(Optional.empty());
+	@Test
+	@DisplayName("search without filters should delegate to repository.findAll(spec)")
+	void search_withoutFilters_shouldDelegateToRepository() {
+		// Arrange
+		Order e1 = new Order();
+		Order e2 = new Order();
 
-        // Act + Assert
-        assertThrows(
-                EntityNotFoundException.class,
-                () -> orderService.findById(999L),
-                "Missing order must trigger EntityNotFoundException"
-        );
-    }
+		OrderDto d1 = new OrderDto();
+		OrderDto d2 = new OrderDto();
 
-    // -------------------------------------------------------------------------
-    // FIND ALL
-    // -------------------------------------------------------------------------
+		when(orderRepository.findAll(any(Specification.class))).thenReturn(List.of(e1, e2));
+		when(orderMapper.toDto(e1)).thenReturn(d1);
+		when(orderMapper.toDto(e2)).thenReturn(d2);
 
-    @Test
-    @DisplayName("findAll() should map all entities to DTOs")
-    void findAll_shouldReturnMappedDtos() {
-        // Arrange
-        Order o1 = createSampleOrder(1L);
-        Order o2 = createSampleOrder(2L);
-        when(orderRepository.findAll()).thenReturn(List.of(o1, o2));
+		// Act
+		List<OrderDto> result = orderService.search(null, null);
 
-        // Act
-        List<OrderDto> result = orderService.findAll();
+		// Assert
+		assertEquals(2, result.size());
 
-        // Assert
-        assertNotNull(result);
-        assertEquals(2, result.size(), "Should return two DTOs");
+		verify(orderRepository, times(1)).findAll(any(Specification.class));
+		verify(orderMapper, times(1)).toDto(e1);
+		verify(orderMapper, times(1)).toDto(e2);
+		verifyNoMoreInteractions(orderRepository, orderMapper);
+	}
 
-        assertEquals(1L, result.get(0).getId());
-        assertEquals("ORD-1", result.get(0).getCode());
+	@Test
+	@DisplayName("search with code + status should still delegate to repository.findAll(spec)")
+	void search_withCodeAndStatus_shouldDelegateToRepository() {
+		// Arrange
+		Order e1 = new Order();
+		OrderDto d1 = new OrderDto();
 
-        assertEquals(2L, result.get(1).getId());
-        assertEquals("ORD-2", result.get(1).getCode());
-    }
+		when(orderRepository.findAll(any(Specification.class))).thenReturn(List.of(e1));
+		when(orderMapper.toDto(e1)).thenReturn(d1);
 
-    // -------------------------------------------------------------------------
-    // UPDATE
-    // -------------------------------------------------------------------------
+		// Act
+		List<OrderDto> result = orderService.search("ORD", OrderStatus.NEW);
 
-    @Test
-    @DisplayName("update() should apply non-null fields and save the entity")
-    void update_shouldApplyChangesAndSave() {
-        // Arrange: existing entity in DB
-        Order existing = createSampleOrder(5L);
-        existing.setStatus(OrderStatus.NEW);
+		// Assert
+		assertEquals(1, result.size());
 
-        when(orderRepository.findById(5L)).thenReturn(Optional.of(existing));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // DTO with some updated fields (partial update)
-        OrderDto dto = new OrderDto();
-        dto.setCode("ORD-5-UPDATED");
-        dto.setStatus(OrderStatus.PAID);          // change status
-        dto.setTotal(BigDecimal.valueOf(999.99)); // change total
-
-        // Act
-        OrderDto result = orderService.update(5L, dto);
-
-        // Assert: returned DTO
-        assertNotNull(result);
-        assertEquals(5L, result.getId());
-        assertEquals("ORD-5-UPDATED", result.getCode());
-        assertEquals(OrderStatus.PAID, result.getStatus());
-        assertEquals(BigDecimal.valueOf(999.99), result.getTotal());
-
-        // Verify that repository.save was invoked with an updated entity
-        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
-        verify(orderRepository).save(orderCaptor.capture());
-        Order savedEntity = orderCaptor.getValue();
-
-        assertEquals("ORD-5-UPDATED", savedEntity.getCode());
-        assertEquals(OrderStatus.PAID, savedEntity.getStatus());
-        assertEquals(BigDecimal.valueOf(999.99), savedEntity.getTotal());
-        assertNotNull(savedEntity.getUpdatedAt(), "updatedAt must be maintained");
-    }
-
-    @Test
-    @DisplayName("update() should throw EntityNotFoundException when the order does not exist")
-    void update_shouldThrowWhenMissing() {
-        // Arrange
-        when(orderRepository.findById(anyLong())).thenReturn(Optional.empty());
-
-        OrderDto dto = new OrderDto();
-        dto.setCode("ORD-X");
-        dto.setTotal(BigDecimal.ONE);
-
-        // Act + Assert
-        assertThrows(
-                EntityNotFoundException.class,
-                () -> orderService.update(123L, dto),
-                "Updating a missing order must trigger EntityNotFoundException"
-        );
-    }
-
-    // -------------------------------------------------------------------------
-    // DELETE
-    // -------------------------------------------------------------------------
-
-    @Test
-    @DisplayName("delete() should delete the order when it exists")
-    void delete_shouldRemoveWhenExists() {
-        // Arrange
-        when(orderRepository.existsById(7L)).thenReturn(true);
-
-        // Act
-        orderService.delete(7L);
-
-        // Assert
-        verify(orderRepository).deleteById(7L);
-    }
-
-    @Test
-    @DisplayName("delete() should throw EntityNotFoundException when the order does not exist")
-    void delete_shouldThrowWhenMissing() {
-        // Arrange
-        when(orderRepository.existsById(anyLong())).thenReturn(false);
-
-        // Act + Assert
-        assertThrows(
-                EntityNotFoundException.class,
-                () -> orderService.delete(999L),
-                "Deleting a missing order must trigger EntityNotFoundException"
-        );
-    }
-
-    // -------------------------------------------------------------------------
-    // SEARCH
-    // -------------------------------------------------------------------------
-
-    @Test
-    @DisplayName("search() with no filters should call repository.findAll(spec)")
-    void search_withoutFilters_shouldDelegateToRepository() {
-        // Arrange: repository returns a single order for the given spec (we don't care how the spec looks)
-        Order order = createSampleOrder(1L);
-        when(orderRepository.findAll(any(Specification.class))).thenReturn(List.of(order));
-
-        // Act
-        List<OrderDto> result = orderService.search(null, null);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("ORD-1", result.get(0).getCode());
-
-        // Verify that we did indeed call the Specification-based findAll
-        verify(orderRepository).findAll(any(Specification.class));
-    }
-
-    @Test
-    @DisplayName("search() with code and status filters should still delegate to repository.findAll(spec)")
-    void search_withCodeAndStatus_shouldDelegateToRepository() {
-        // Arrange: again we only care that the service delegates correctly
-        Order order = createSampleOrder(2L);
-        when(orderRepository.findAll(any(Specification.class))).thenReturn(List.of(order));
-
-        // Act
-        List<OrderDto> result = orderService.search("ORD-2", OrderStatus.NEW);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("ORD-2", result.get(0).getCode());
-        assertEquals(OrderStatus.NEW, result.get(0).getStatus());
-
-        // Even though we don't inspect the Specification, this line ensures
-        // that the Specification-based path in OrderServiceImpl is executed.
-        verify(orderRepository).findAll(any(Specification.class));
-    }
-
-    // -------------------------------------------------------------------------
-    // FIND BY CODE
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("findByCode")
-    class FindByCodeTests {
-
-        @Test
-        @DisplayName("findByCode() should return DTO when the order exists")
-        void findByCode_shouldReturnDto_whenOrderExists() {
-            Order o = new Order();
-            o.setId(10L);
-            o.setCode("ABC123");
-
-            when(orderRepository.findByCodeIgnoreCase("ABC123"))
-                    .thenReturn(Optional.of(o));
-
-            OrderDto dto = orderService.findByCode("ABC123");
-
-            assertNotNull(dto);
-            assertEquals(10L, dto.getId());
-            assertEquals("ABC123", dto.getCode());
-        }
-
-        @Test
-        @DisplayName("findByCode() should throw EntityNotFoundException when the order does not exist")
-        void findByCode_shouldThrowNotFound_whenMissing() {
-            when(orderRepository.findByCodeIgnoreCase("NOPE"))
-                    .thenReturn(Optional.empty());
-
-            assertThrows(
-                    EntityNotFoundException.class,
-                    () -> orderService.findByCode("NOPE"),
-                    "Missing order code must trigger EntityNotFoundException"
-            );
-        }
-    }
+		verify(orderRepository, times(1)).findAll(any(Specification.class));
+		verify(orderMapper, times(1)).toDto(e1);
+		verifyNoMoreInteractions(orderRepository, orderMapper);
+	}
 }

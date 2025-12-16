@@ -1,8 +1,9 @@
 package ch.devprojects.orderflow.repository;
 
-import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -10,25 +11,18 @@ import ch.devprojects.orderflow.domain.Order;
 import ch.devprojects.orderflow.domain.OrderStatus;
 
 /**
- * Repository for Order persistence and query access.
+ * Main JPA repository for Order.
  *
- * Notes: - JpaRepository gives CRUD + paging/sorting basics. -
- * JpaSpecificationExecutor allows dynamic filtering via Specifications. -
- * Derived query methods (like findByCodeIgnoreCase) are built from field names.
+ * Important: - Extends JpaSpecificationExecutor<Order> so OrderQueryServiceImpl
+ * can build dynamic filters - Keeps basic finder methods for common use cases
  */
 public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecificationExecutor<Order> {
 
-	/**
-	 * Find an order by its business code (case-insensitive).
-	 */
-	Optional<Order> findByCodeIgnoreCase(String code);
+	Optional<Order> findByCode(String code);
 
-	/**
-	 * Find all orders by their status.
-	 *
-	 * Important: - This method name must match the exact field name in Order. - It
-	 * will work if your Order entity has a field named: "status" of type
-	 * OrderStatus (or compatible).
-	 */
-	List<Order> findByStatus(OrderStatus status);
+	Page<Order> findByCustomerNameContainingIgnoreCase(String customerName, Pageable pageable);
+
+	Page<Order> findByStatus(OrderStatus status, Pageable pageable);
+
+	Page<Order> findByCustomerNameContainingIgnoreCaseAndStatus(String customerName, OrderStatus status, Pageable pageable);
 }

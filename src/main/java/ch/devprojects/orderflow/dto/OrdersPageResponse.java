@@ -4,44 +4,28 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Response wrapper for paginated order search results.
+ * Paged response for the "/api/orders/search" endpoint.
  *
- * Important: - content is List<OrderResponseDto> (not entities) - "content"
- * naming matches Page-like semantics and your current MVC tests
+ * Why a custom wrapper instead of returning Page<OrderDto> directly? - Keeps
+ * the REST contract stable (frontend doesn't depend on Spring's Page JSON
+ * shape) - Allows you to add extra metadata later without breaking clients
  */
 public class OrdersPageResponse {
 
-	private List<OrderResponseDto> content = new ArrayList<>();
-
+	private List<OrderDto> content = new ArrayList<>();
 	private int page;
 	private int size;
-
 	private long totalElements;
 	private int totalPages;
 
-	private boolean first;
-	private boolean last;
-
 	public OrdersPageResponse() {
-		// default constructor for JSON serialization
 	}
 
-	public OrdersPageResponse(List<OrderResponseDto> content, int page, int size, long totalElements, int totalPages,
-			boolean first, boolean last) {
-		this.content = content;
-		this.page = page;
-		this.size = size;
-		this.totalElements = totalElements;
-		this.totalPages = totalPages;
-		this.first = first;
-		this.last = last;
-	}
-
-	public List<OrderResponseDto> getContent() {
+	public List<OrderDto> getContent() {
 		return content;
 	}
 
-	public void setContent(List<OrderResponseDto> content) {
+	public void setContent(List<OrderDto> content) {
 		this.content = content;
 	}
 
@@ -75,21 +59,5 @@ public class OrdersPageResponse {
 
 	public void setTotalPages(int totalPages) {
 		this.totalPages = totalPages;
-	}
-
-	public boolean isFirst() {
-		return first;
-	}
-
-	public void setFirst(boolean first) {
-		this.first = first;
-	}
-
-	public boolean isLast() {
-		return last;
-	}
-
-	public void setLast(boolean last) {
-		this.last = last;
 	}
 }

@@ -1,31 +1,37 @@
 package ch.devprojects.orderflow.dto;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
+
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 /**
- * DTO returned to the frontend for order list / search results.
+ * Read-only response DTO.
  *
- * Design choices (matching current tests + typical Angular expectations): -
- * status is a String (e.g. "NEW") rather than an enum - createdAt is
- * LocalDateTime (simple JSON representation)
+ * Kept separate from OrderDto in case you want to: - hide fields - add derived
+ * fields - prevent certain fields from being accepted on create/update
  *
- * This avoids leaking JPA entities to the frontend.
+ * For now it mirrors OrderDto in a safe, explicit way.
  */
 public class OrderResponseDto {
 
 	private Long id;
 	private String code;
 	private String status;
-
-	private String customerName;
-	private String assignedTo;
-
 	private BigDecimal total;
-	private LocalDateTime createdAt;
+	private String customerName;
+
+	/**
+	 * Canonical free-text field. JsonAlias is kept for tolerance if this DTO is
+	 * ever reused as input.
+	 */
+	@JsonAlias("comment")
+	private String description;
+
+	private Instant createdAt;
+	private Instant updatedAt;
 
 	public OrderResponseDto() {
-		// default constructor for JSON serialization
 	}
 
 	public Long getId() {
@@ -52,22 +58,6 @@ public class OrderResponseDto {
 		this.status = status;
 	}
 
-	public String getCustomerName() {
-		return customerName;
-	}
-
-	public void setCustomerName(String customerName) {
-		this.customerName = customerName;
-	}
-
-	public String getAssignedTo() {
-		return assignedTo;
-	}
-
-	public void setAssignedTo(String assignedTo) {
-		this.assignedTo = assignedTo;
-	}
-
 	public BigDecimal getTotal() {
 		return total;
 	}
@@ -76,11 +66,35 @@ public class OrderResponseDto {
 		this.total = total;
 	}
 
-	public LocalDateTime getCreatedAt() {
+	public String getCustomerName() {
+		return customerName;
+	}
+
+	public void setCustomerName(String customerName) {
+		this.customerName = customerName;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	public Instant getCreatedAt() {
 		return createdAt;
 	}
 
-	public void setCreatedAt(LocalDateTime createdAt) {
+	public void setCreatedAt(Instant createdAt) {
 		this.createdAt = createdAt;
+	}
+
+	public Instant getUpdatedAt() {
+		return updatedAt;
+	}
+
+	public void setUpdatedAt(Instant updatedAt) {
+		this.updatedAt = updatedAt;
 	}
 }
